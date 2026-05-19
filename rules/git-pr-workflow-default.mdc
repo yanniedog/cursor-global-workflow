@@ -1,0 +1,37 @@
+---
+description: "Ship bar summary — branch, PR, CI, bot wait, thread closure, merge, verify (project-specific steps 8–9)"
+alwaysApply: true
+---
+
+# Ship bar (Cursor summary)
+
+**Authoritative copy:** repo **`WORKFLOW.md`**. Read in full before shipping.
+
+Every repo change follows: `agent/<slug>` branch → PR to `main` → CI → wait gate → feedback synthesis → thread closure → merge → **`{DEPLOY_COMMAND}`** → **`{VERIFY_COMMAND}`**.
+
+Configure placeholders in `WORKFLOW.md` and `.cursor/project.json`.
+
+## Steps
+
+1. Branch from fresh `main` (`git fetch`, `checkout -b agent/<slug>`).
+2. Commit and push on the topic branch only.
+3. One PR to `main`; fix-ups stay on the same branch.
+4. CI green (`gh pr checks <n> --watch`).
+5. **`npm run wait-for-bots`** after creating a PR; loop until exit 0. After tagging bots: `--bot-tag` then loop. Code pushes alone do not restart the wait.
+5b. Synthesize all threads → post `## Feedback plan` → one push → in-thread replies.
+6. Thread closure on every substantive thread before merge.
+7. Merge (`gh pr merge --squash`) only after 5–6 and `pr:bot-feedback-check` exit 0.
+8. **Deploy / dev:** `{DEPLOY_COMMAND}` — restart server or deploy as documented in your project.
+9. **Verify:** `{VERIFY_COMMAND}`; use **deep-browser-explore** / Browser MCP for UI. Exit code must be **0**.
+
+## Closeout
+
+```sh
+npm run ship:closeout:strict && npm run wait-for-bots
+```
+
+## Forbidden completions
+
+While an open PR exists and you can merge: do not say "done", "shipped", "CI green so we're good", "merge-ready", or "handing off the PR" without steps 5b–6.
+
+See **`WORKFLOW.md`** for exceptions and after-merge cleanup.

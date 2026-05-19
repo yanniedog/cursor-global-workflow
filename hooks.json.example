@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "subagentStop": [
+      {
+        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\orchestrator-remind.mjs\""
+      }
+    ],
+    "stop": [
+      {
+        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\orchestrator-remind.mjs\""
+      }
+    ]
+  }
+}

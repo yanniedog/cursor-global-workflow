@@ -1,0 +1,8 @@
+{
+  "workflow": {
+    "projectName": "my-app",
+    "verifyCommand": "npm test",
+    "deployCommand": "npm run dev",
+    "browserBaseUrl": "http://127.0.0.1:3000/"
+  }
+}

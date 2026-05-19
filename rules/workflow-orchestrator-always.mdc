@@ -1,0 +1,38 @@
+---
+description: "Chief delegates workflow orchestrator for ship bar; one PR per task; no monolithic bundles"
+alwaysApply: true
+---
+
+# Continuous workflow orchestrator
+
+**Chief agent** (coordination) sits above a **polling orchestrator** (ship bar). Parent agents spawn **chief first**; chief delegates orchestrator cycles.
+
+## Session start
+
+If dirty `git status`, open `gh pr list`, or recent subagent work — **spawn chief first** unless waived. Chief delegates orchestrator for git/PR work.
+
+**Manual orchestrator invoke** (`run workflow orchestrator`) when chief waived or already delegated this turn.
+
+## After substantive subagent work
+
+1. Spawn or resume **chief** unless in flight or waived.
+2. Chief re-scans and delegates orchestrator or path owners.
+3. When executing orchestrator yourself, follow `~/.cursor/skills/workflow-orchestrator/SKILL.md`.
+
+## One PR per task (hard)
+
+- **Do not** bundle unrelated features, docs, and infra in one PR.
+- Partition by disjoint file sets; one branch per logical task.
+- Meta workflow plumbing stays its own PR.
+
+## Babysit pairing
+
+For open PR review / CI / bot threads, delegate to **Cursor built-in babysit skill** (`babysit/SKILL.md`) with one worker per PR number.
+
+## Ship bar
+
+Orchestrator coordinates `WORKFLOW.md` steps 5–7 (bot wait, synthesis, thread closure) and project-specific steps 8–9 (`{DEPLOY_COMMAND}`, `{VERIFY_COMMAND}`). Does **not** waive closeout gates.
+
+## Manual invoke
+
+**"run workflow orchestrator"** — read orchestrator skill and run SCAN→PLAN→DELEGATE.

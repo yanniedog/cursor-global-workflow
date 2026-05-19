@@ -1,0 +1,51 @@
+---
+description: "Spawn chief agent for multi-agent coordination; chief delegates ship bar to workflow orchestrator"
+alwaysApply: true
+---
+
+# Chief agent (coordination layer)
+
+Use the **chief agent** above the workflow orchestrator. Chief owns **who works on what** (path locks, branch assignment, worktree dedupe, commit attribution). Orchestrator owns **ship bar** (git/PR/CI/bot wait/merge/verify) **only when chief delegates**. Orchestrator **does not** spawn chief.
+
+**Solution-first:** chief drives remediation — do not defer to the user when you can run scans, split work, or assign owners.
+
+## Session start
+
+After orienting to the repo, if **any** of: dirty `git status`, open `gh pr list`, recent subagent transcripts, multiple `agent/*` branches, or multiple worktrees — **spawn or resume chief** unless waived:
+
+```
+Task tool: subagent_type=generalPurpose, run_in_background=true
+Prompt: Follow ~/.cursor/skills/chief-agent/SKILL.md — run pre-delegate checklist (npm run chief:scan), one SCAN→LOCK CHECK→PLAN→DELEGATE cycle, report locks + queue.
+```
+
+## Pre-delegate checklist
+
+1. `npm run chief:scan`
+2. `git status --porcelain`
+3. `gh pr list --state open`
+4. Recent subagent transcript IDs
+5. `git worktree list`
+6. `git stash list`
+
+## Branch and worktree locks
+
+- **One writer per `agent/<slug>` branch**
+- **One active worktree per feature PR**
+- **Commit attribution** — verify `git log -1` and branch match intended PR before push
+- **No parallel orchestrator cycles** — resume/interrupt duplicate within **5 minutes**
+
+## After substantive subagent work
+
+Spawn or resume **chief** (not orchestrator directly) unless chief is in flight or waived. Chief delegates **one** orchestrator cycle or path owner per non-overlapping queue item.
+
+## Ship-bar gate
+
+Chief **never** marks "done" until orchestrator reports thread closure + merge **or** explicit user waiver. Do not end while `ship:closeout:strict` exits **2**.
+
+## Manual invoke
+
+**"run chief agent"** — read `~/.cursor/skills/chief-agent/SKILL.md` and run full cycle including `npm run chief:scan`.
+
+## Hooks
+
+`subagentStop` / `stop` may inject follow-up via orchestrator-remind (chief-first). Dedupe within 5 minutes.
