@@ -34,11 +34,21 @@ function ghJson(args) {
   return JSON.parse(r.stdout || '{}');
 }
 
+function isPlausibleRepoPath(p) {
+  if (/^Node\.js$/i.test(p)) return false;
+  if (/^scripts\/foo\./i.test(p)) return false;
+  if (/^[\w.-]+\.(?:py|mjs|js|md|json)$/i.test(p) && !p.includes('/') && !p.startsWith('.')) {
+    return false;
+  }
+  if (!p.includes('/') && !p.startsWith('.')) return false;
+  return true;
+}
+
 function extractFilePaths(text) {
   const paths = new Set();
   for (const m of (text || '').matchAll(PATH_RE)) {
     const p = m[1].replace(/\\/g, '/');
-    if (!p.includes('node_modules')) paths.add(p);
+    if (!p.includes('node_modules') && isPlausibleRepoPath(p)) paths.add(p);
   }
   return [...paths];
 }
@@ -126,12 +136,12 @@ function checkPrOnMain(prNumber) {
       const headHash = blobHash(pr.headRefOid, f);
       const mainHash = blobHash('origin/main', f);
       const mergeHash = blobHash(mergeOid, f);
-      if (headHash && mainHash !== headHash && mergeHash !== headHash) {
+      if (mergeHash && mainHash !== mergeHash) {
         gaps.push({
           kind: 'file_content_gap',
           pr: prNumber,
           file: f,
-          remediation: `Open agent/close-loop-pr-${prNumber}-followup with ${f} from PR head`,
+          remediation: `Open agent/close-loop-pr-${prNumber}-followup with ${f} from merge commit ${mergeOid.slice(0, 8)}`,
         });
       }
     }
