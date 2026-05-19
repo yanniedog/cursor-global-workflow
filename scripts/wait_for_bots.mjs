@@ -169,6 +169,16 @@ function fetchBotActivity(owner, name, prNumber) {
   return { events };
 }
 
+function ignoredCheckNames() {
+  const raw = process.env.BOT_WAIT_IGNORE_CHECK_NAMES || '';
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 function fetchChecks(prNumber) {
   const r = spawnSync('gh', ['pr', 'checks', String(prNumber), '--json', 'name,bucket,state'], {
     encoding: 'utf8',
@@ -182,9 +192,15 @@ function fetchChecks(prNumber) {
   if (!stdout) return { pending: true };
   try {
     const checks = JSON.parse(stdout);
-    return {
-      pending: Array.isArray(checks) && checks.some((c) => c.bucket === 'pending'),
-    };
+    const ignore = ignoredCheckNames();
+    const pending =
+      Array.isArray(checks) &&
+      checks.some((c) => {
+        const name = (c.name || '').toLowerCase();
+        if (ignore.has(name)) return false;
+        return c.bucket === 'pending';
+      });
+    return { pending };
   } catch (e) {
     return { pending: true, error: `Invalid JSON from gh pr checks: ${e.message}` };
   }
@@ -320,6 +336,7 @@ Exit codes: 0 ready | 2 still waiting | 1 error or required bots missing at cap 
 
 Env: BOT_WAIT_POLL_SEC, BOT_WAIT_QUIET_SEC, BOT_WAIT_MIN_SEC, BOT_WAIT_MAX_MIN,
      AR_BOT_WAIT_REQUIRED (or BOT_WAIT_REQUIRED) ó comma-separated bot keys
+     BOT_WAIT_IGNORE_CHECK_NAMES ó comma-separated gh pr checks names to ignore (CI self-gate)
 
 Required bots: ${formatRequiredKeys(requiredKeys)}
 `);
@@ -401,7 +418,7 @@ async function main() {
     if (result.status === 'timeout' || result.status === 'error') {
       console.error(`>>> BOT WAIT ${result.status.toUpperCase()}: ${result.message}`);
       if (result.missing?.length) {
-        console.error(`>>> Missing required bots: ${result.missing.join(', ')} ó merge is blocked.`);
+        console.error(`>>> Missing required bots: ${result.missing.join(', ')} ù merge is blocked.`);
       }
       process.exit(1);
     }
@@ -411,7 +428,7 @@ async function main() {
         `>>> Elapsed ${formatDuration(result.elapsedMs)}; cap remaining ~${formatDuration(result.remainingCapMs)}`,
       );
     }
-    console.log(`>>> PR #${prNumber} ó retry: npm run wait-for-bots -- --pr ${prNumber}`);
+    console.log(`>>> PR #${prNumber} ù retry: npm run wait-for-bots -- --pr ${prNumber}`);
     process.exit(2);
   };
 

@@ -11,6 +11,7 @@
     "pr:bot-feedback-audit": "node scripts/pr-bot-feedback-check.mjs --audit-merged --limit 20",
     "close-loop:check": "node scripts/close-loop-check.mjs",
     "ship:closeout:strict": "node scripts/ship-closeout-strict.mjs",
-    "git:graph-hygiene": "git fetch origin --prune"
+    "git:graph-hygiene": "git fetch origin --prune",
+    "branch-protection:apply": "node scripts/apply-branch-protection.mjs"
   }
 }
