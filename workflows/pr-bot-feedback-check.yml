@@ -3,9 +3,21 @@ name: pr-bot-feedback-check
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
-  bot-feedback-gate:
+  pr-bot-feedback-check:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,10 +31,10 @@ jobs:
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           sudo apt update
           sudo apt install gh -y
-      - name: Bot feedback thread gate
+      - name: Review thread closure gate
         env:
           GH_TOKEN: ${{ github.token }}
-          AR_BOT_WAIT_REQUIRED: gemini,codex,sourcery
         run: |
           SCRIPT="${CURSOR_WORKFLOW_SCRIPTS:-./scripts}/pr-bot-feedback-check.mjs"
-          node "$SCRIPT" --pr ${{ github.event.pull_request.number }} --quiet
+          PR="${{ github.event.pull_request.number || github.event.issue.number }}"
+          node "$SCRIPT" --pr "$PR" --skip-bot-presence

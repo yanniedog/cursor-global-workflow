@@ -31,7 +31,7 @@ Commit only on the topic branch. `git push -u origin HEAD`.
 
 `gh pr checks <n> --watch` until required checks pass. Fix forward on this PR. After fix pushes, `@mention` reviewers using handles from `gh pr view -c`.
 
-**Required GitHub status checks (when branch protection is enabled):** `bot-presence-gate`, `bot-feedback-gate`. Apply: `npm run branch-protection:apply`.
+**Required GitHub status checks (when branch protection is enabled):** `bot-presence-gate`, `pr-bot-feedback-check`. Apply: `npm run branch-protection:apply`.
 
 ### 5. Bot wait trigger (dynamic)
 
@@ -66,7 +66,7 @@ npm run pr:bot-feedback-check -- --pr <n>
 
 ### 7. Merge
 
-`gh pr merge --squash` only after steps 5–6 **and** GitHub checks **`bot-presence-gate`** + **`bot-feedback-gate`** are green (when branch protection is enabled).
+`gh pr merge --squash` only after steps 5–6 **and** GitHub checks **`bot-presence-gate`** + **`pr-bot-feedback-check`** are green (when branch protection is enabled).
 
 **Close without merge:** GitHub cannot block "Close pull request". Agents must not close without merge unless waived; `npm run agent:auditor` flags closed-unmerged PRs with open bot threads.
 
@@ -105,4 +105,4 @@ npm run ship:closeout:strict && npm run wait-for-bots
 npm run branch-protection:apply
 ```
 
-Requires **`bot-presence-gate`** and **`bot-feedback-gate`** on `main` plus **`required_conversation_resolution`**. See script output for manual UI steps if API fails (403).
+Requires **`bot-presence-gate`** and **`pr-bot-feedback-check`** on `main` plus **`required_conversation_resolution`**. See script output for manual UI steps if API fails (403). GitHub cannot block **Close pull request**.
