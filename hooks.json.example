@@ -1,14 +1,30 @@
 {
   "version": 1,
   "hooks": {
+    "sessionStart": [
+      {
+        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\repo-auto-bootstrap.mjs\"",
+        "loop_limit": 1
+      }
+    ],
     "subagentStop": [
       {
-        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\orchestrator-remind.mjs\""
+        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\auditor-watch.mjs\"",
+        "loop_limit": 2
+      },
+      {
+        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\orchestrator-remind.mjs\"",
+        "loop_limit": 2
       }
     ],
     "stop": [
       {
-        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\orchestrator-remind.mjs\""
+        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\auditor-watch.mjs\"",
+        "loop_limit": 2
+      },
+      {
+        "command": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\orchestrator-remind.mjs\"",
+        "loop_limit": 2
       }
     ]
   }

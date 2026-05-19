@@ -1,0 +1,20 @@
+{
+  "sessionStart": [
+    {
+      "command": "node \"__CURSOR_WORKFLOW_SCRIPTS__/repo-auto-bootstrap.mjs\"",
+      "loop_limit": 1
+    }
+  ],
+  "subagentStop": [
+    {
+      "command": "node \"__CURSOR_WORKFLOW_SCRIPTS__/orchestrator-remind.mjs\"",
+      "loop_limit": 2
+    }
+  ],
+  "stop": [
+    {
+      "command": "node \"__CURSOR_WORKFLOW_SCRIPTS__/orchestrator-remind.mjs\"",
+      "loop_limit": 2
+    }
+  ]
+}

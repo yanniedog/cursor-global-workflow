@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Lightweight reminder after subagent/parent stop when repo needs coordination.
- * Chief-first message; chief delegates ship bar to workflow-orchestrator.
+ * Chief-first message (after auditor-watch); chief delegates ship bar to workflow-orchestrator.
  */
 import { execSync } from 'node:child_process';
 

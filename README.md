@@ -2,7 +2,40 @@
 
 Reusable Cursor agents, rules, and scripts for **all** projects — chief coordination, ship bar, bot wait, PR thread closure, and browser QA.
 
-Install once per machine; opt in per repo with a tiny rule stub.
+Install once per machine. After install, **every git repo** under your code folder is bootstrapped automatically when you open it in **Cursor** (zero manual steps per repo).
+
+---
+
+## Zero-touch automation (Cursor only)
+
+Hooks are **Cursor-specific** — they do not run in VS Code.
+
+| Trigger | Hook event | Script |
+|---------|------------|--------|
+| Open any workspace in Cursor | `sessionStart` (user-global `~/.cursor/hooks.json`) | `repo-auto-bootstrap.mjs` |
+
+On each session start, if `.cursor/workflow-bootstrapped` is missing or older than the global `bootstrap-version.txt`, the hook creates:
+
+- `.cursor/rules/00-use-global-workflow.mdc` (from installed template)
+- `.cursor/workflow-bootstrapped` (version marker)
+- `WORKFLOW.md` at repo root **only if missing** (never overwrites)
+- npm script stubs in `package.json` **only for missing keys** (never overwrites existing scripts)
+
+Idempotent and fast; no secrets.
+
+**New repos:** create or `git init` a folder under your code directory, open it in Cursor once — bootstrap runs via `sessionStart`.
+
+**Existing repos (one-time batch):**
+
+```powershell
+cd $env:USERPROFILE\code\cursor-global-workflow
+.\install.ps1
+.\scripts\bootstrap-all-repos.ps1 -CodeRoot $env:USERPROFILE\code -Commit
+```
+
+Use `-Push` only when you want every bootstrapped repo pushed (optional).
+
+Bump `bootstrap-version.txt` and re-run `install.ps1` to refresh all repos on next Cursor open.
 
 ---
 
@@ -106,11 +139,14 @@ git submodule add https://github.com/yanniedog/cursor-global-workflow.git .curso
 
 ### 3. Existing repos
 
+Preferred: run **tier 1** install, then either open each repo in Cursor (auto) or `scripts/bootstrap-all-repos.ps1 -Commit`.
+
+Manual fallback (only if hooks disabled):
+
 1. Run **tier 1** install once on the machine.
 2. Copy `templates/00-use-global-workflow.mdc` → `YOUR_REPO/.cursor/rules/00-use-global-workflow.mdc`
 3. Copy `templates/WORKFLOW.md` → `YOUR_REPO/WORKFLOW.md` and fill placeholders.
 4. Add npm scripts from tier 2 (or keep local script copies that delegate to global path).
-5. Optional: symlink `~/.cursor/skills/chief-agent` is not needed — install already places skills globally.
 
 ---
 

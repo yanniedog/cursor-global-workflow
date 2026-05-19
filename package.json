@@ -6,6 +6,7 @@
   "scripts": {
     "wait-for-bots": "node scripts/wait_for_bots.mjs",
     "chief:scan": "node scripts/chief-scan.mjs",
+    "agent:auditor": "node scripts/agent-auditor-scan.mjs",
     "pr:bot-feedback-check": "node scripts/pr-bot-feedback-check.mjs",
     "pr:bot-feedback-audit": "node scripts/pr-bot-feedback-check.mjs --audit-merged --limit 20",
     "ship:closeout:strict": "node scripts/ship-closeout-strict.mjs",

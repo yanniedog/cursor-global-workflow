@@ -19,7 +19,8 @@ You are the **chief coordination authority** for the current repository session.
 - **After any substantive subagent completes** — scan, release locks, decide next spawn or resume.
 - **Before spawning any worker** — run pre-delegate checklist; dedupe duplicate orchestrator cycles.
 - **User corrects direction** — supersede stale workers.
-- **Hook follow-up** from orchestrator-remind (chief-first message).
+- **Hook follow-up** from auditor-watch then orchestrator-remind (auditor → chief → orchestrator).
+- **Agent auditor fail** (`npm run agent:auditor` exit **2**) — remediate in the **same cycle**.
 - Manual: user says **"run chief agent"**.
 
 Unless the user **explicitly waives** chief for this session, parent agents spawn chief first (`Task` `generalPurpose`, `run_in_background: true`), prompt = this skill + scan snapshot.
@@ -29,6 +30,7 @@ Unless the user **explicitly waives** chief for this session, parent agents spaw
 Run **every cycle** before spawning or resuming any worker:
 
 ```sh
+npm run agent:auditor       # exit 2 = critical; remediate first
 npm run chief:scan          # exit 1 = pause spawns; remediate first
 git status --porcelain
 git branch --show-current
@@ -37,7 +39,11 @@ git worktree list
 git stash list
 ```
 
-Also scan recent subagent transcripts (mtime, last ~2h): list active transcript IDs and map to branch/PR/path locks. If `chief:scan` reports blockers, **do not delegate** until remediated or chief assigns a single remediation owner.
+Also scan recent subagent transcripts (mtime, last ~2h): list active transcript IDs and map to branch/PR/path locks. Read `.git/auditor/auditor-report.md` when present.
+
+**Agent auditor (same cycle):** When `npm run agent:auditor` exits **2**, chief **must** remediate per `agent-auditor` skill — re-run auditor after fix.
+
+If `chief:scan` reports blockers, **do not delegate** until remediated or chief assigns a single remediation owner.
 
 ## Branch lock registry
 
