@@ -44,9 +44,11 @@ Run after creating a new PR (or after tagging bots). Exit **2** = still waiting,
 **Ready when** (since wait anchor — PR creation or `--bot-tag`):
 
 - Required CI checks are not pending, **and**
-- At least one configured bot has commented since the anchor, **and**
-- Either no bot activity for **90s** (quiet window) **or** every configured bot has posted, **and**
-- At least **60s** since anchor (unless cached ready state)
+- **Every required bot** has posted since the anchor (default: **gemini**, **codex**, **sourcery**), **and**
+- **90s** quiet window after last bot activity, **and**
+- At least **60s** since anchor
+
+Override: `AR_BOT_WAIT_REQUIRED=gemini,codex,sourcery` or `--require-bots`. If required bots never post before the safety cap, exit **1** — **DO NOT MERGE**.
 
 ### 5b. Feedback synthesis
 

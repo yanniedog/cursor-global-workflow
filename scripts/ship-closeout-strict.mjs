@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Exit 2 when an open PR exists for the current branch (ship closeout guard).
- * Also runs pr-bot-feedback-check when PR number is known.
+ * Runs wait-for-bots and pr-bot-feedback-check when PR number is known.
  */
 import { execSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -60,18 +60,36 @@ function main() {
   }
 
   const prNumber = data[0]?.number;
+  const dir = scriptsDir();
   console.error(
     `ship-closeout-strict: open PR still exists for ${branch} — complete WORKFLOW.md steps 5–9.`,
   );
 
   if (prNumber) {
-    const checkPath = join(scriptsDir(), 'pr-bot-feedback-check.mjs');
+    const waitPath = join(dir, 'wait_for_bots.mjs');
+    const wait = spawnSync(process.execPath, [waitPath, '--pr', String(prNumber)], {
+      stdio: 'inherit',
+    });
+    if (wait.status === 2) {
+      console.error(
+        'ship-closeout-strict: bot wait not satisfied — run npm run wait-for-bots until exit 0.',
+      );
+      process.exit(2);
+    }
+    if (wait.status === 1) {
+      console.error(
+        'ship-closeout-strict: bot wait failed (required bots missing or error) — do not merge.',
+      );
+      process.exit(2);
+    }
+
+    const checkPath = join(dir, 'pr-bot-feedback-check.mjs');
     const gate = spawnSync(process.execPath, [checkPath, '--pr', String(prNumber)], {
       stdio: 'inherit',
     });
     if (gate.status === 1) {
       console.error(
-        'ship-closeout-strict: bot feedback gate failed — close review threads before merge.',
+        'ship-closeout-strict: bot feedback gate failed — wait for required bots and close review threads before merge.',
       );
       process.exit(2);
     }

@@ -16,7 +16,7 @@ Any change that touches **any** of:
 | Skills | `skills/chief-agent/`, `skills/workflow-orchestrator/`, `skills/deep-browser-explore/`, `skills/agent-auditor/` |
 | User install copies | `~/.cursor/skills/{chief-agent,workflow-orchestrator,deep-browser-explore,agent-auditor}/` |
 | Project copies | `.cursor/skills/{chief-agent,workflow-orchestrator,deep-browser-explore,agent-auditor}/` |
-| Scripts | `wait_for_bots.mjs`, `chief-scan.mjs`, `pr-bot-feedback-check*`, `ship-closeout*`, `agent-auditor-scan*`, `orchestrator-remind*`, `repo-auto-bootstrap.mjs`, `lib/agent-auditor-lib.mjs`, `lib/repo-bootstrap.mjs`, `lib/gh-pr-review-threads.mjs` |
+| Scripts | `wait_for_bots.mjs`, `chief-scan.mjs`, `pr-bot-feedback-check*`, `ship-closeout*`, `agent-auditor-scan*`, `orchestrator-remind*`, `repo-auto-bootstrap.mjs`, `lib/bot-wait-config.mjs`, `lib/bot-wait-presence.mjs`, `lib/agent-auditor-lib.mjs`, `lib/repo-bootstrap.mjs`, `lib/gh-pr-review-threads.mjs` |
 | Hooks | `hooks/auditor-watch.mjs`, `hooks/orchestrator-remind.mjs` |
 | Shared rules | `rules/chief-agent-always.mdc`, `workflow-orchestrator-always.mdc`, `agent-auditor-always.mdc`, `git-pr-workflow-default.mdc`, `no-early-stop-after-pr.mdc`, `pr-review-bot-replies.mdc`, `respond-to-each-review-comment.mdc`, `multiagent-modularity.mdc`, `workflow-rules-never-overridden.mdc` |
 
