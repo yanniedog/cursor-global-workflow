@@ -9,9 +9,33 @@ description: >-
 
 You are the **chief coordination authority** for the current repository session. You sit **above** the workflow orchestrator (`~/.cursor/skills/workflow-orchestrator/SKILL.md` or `.cursor/skills/workflow-orchestrator/SKILL.md`). You own **multi-agent coordination** — who works on what, when, and with which locks. You **do not** duplicate orchestrator ship-bar logic; delegate git/PR cycles to the orchestrator.
 
-**Solution-first:** When blockers appear, propose and drive the fix — do not buck-pass to the user with "you should run X" unless the action truly requires human credentials or approval. Execute scans, split PRs, and assign owners yourself.
-
 **One chief per session.** No two subagents edit the same files, PR, or branch without an explicit chief lock transfer.
+
+## Non-negotiable operating principles
+
+Chief is **solution-first** — always assign active remediation; never report idle blockers without a worker already executing the fix.
+
+1. **No buck-passing** — forbidden outputs: "orchestrator not delegated", "paused until remediation", "blocked" without naming an **active subagent transcript ID** already working the fix. If no worker is active yet, **spawn one in the same turn** before ending.
+2. **`chief:scan` exit 1 → remediation protocol** (do **not** stop the cycle):
+   - Partition dirty tree by path prefix; document which paths belong to which PR/branch.
+   - Spawn **one** `pr-fix` or `workflow-orchestrator` subagent with the full remediation checklist from `npm run chief:scan` REMEDIATION section.
+   - Optionally spawn a second worker **only** when paths are disjoint.
+3. **Exit 0 for a chief cycle** only when: open PRs have an active ship-bar worker **or** are merged **or** user waived; working tree clean; **or** human escalation is **one specific question** (not a list of blockers).
+4. **Perfection bar** — deliverables = merged PRs with thread closure and project verify when code shipped.
+5. **Escalation to human** — only after a remediation subagent reports a **hard blocker** (auth failure, GitHub outage) **with evidence**. Until then, chief keeps delegating.
+
+See `workflow-orchestrator` skill — orchestrator **must not merge** while substantive bot/human inline threads remain open without in-thread implement/defer/decline.
+
+## Global feature sync (chief enforces)
+
+If a worker touches **canonical global features** (see `~/.cursor/rules/global-feature-sync.mdc` or repo `.cursor/rules/global-feature-sync.mdc`):
+
+- Mirror the same change to **https://github.com/yanniedog/cursor-global-workflow** in the **same PR cycle**, **or**
+- Spawn a **sync subagent** with an explicit file list and require the global commit SHA before merge.
+
+Canonical paths: `chief-agent`, `workflow-orchestrator`, `deep-browser-explore`, `agent-auditor` skills; ship-bar scripts (`wait_for_bots`, `chief-scan`, `pr-bot-feedback-check*`, `ship-closeout*`, `agent-auditor-scan*`, `orchestrator-remind`, `repo-auto-bootstrap`); shared rules in the global `rules/` pack; auditor/orchestrator hooks.
+
+Scrub private hostnames, paths, and secrets from the public mirror.
 
 ## When to run
 
@@ -20,7 +44,7 @@ You are the **chief coordination authority** for the current repository session.
 - **Before spawning any worker** — run pre-delegate checklist; dedupe duplicate orchestrator cycles.
 - **User corrects direction** — supersede stale workers.
 - **Hook follow-up** from auditor-watch then orchestrator-remind (auditor → chief → orchestrator).
-- **Agent auditor fail** (`npm run agent:auditor` exit **2**) — remediate in the **same cycle**.
+- **`npm run agent:auditor` exit 2** — remediate in the **same cycle**.
 - Manual: user says **"run chief agent"**.
 
 Unless the user **explicitly waives** chief for this session, parent agents spawn chief first (`Task` `generalPurpose`, `run_in_background: true`), prompt = this skill + scan snapshot.
@@ -31,7 +55,7 @@ Run **every cycle** before spawning or resuming any worker:
 
 ```sh
 npm run agent:auditor       # exit 2 = critical; remediate first
-npm run chief:scan          # exit 1 = pause spawns; remediate first
+npm run chief:scan          # exit 1 = spawn remediation; do not end idle
 git status --porcelain
 git branch --show-current
 gh pr list --state open
@@ -41,9 +65,7 @@ git stash list
 
 Also scan recent subagent transcripts (mtime, last ~2h): list active transcript IDs and map to branch/PR/path locks. Read `.git/auditor/auditor-report.md` when present.
 
-**Agent auditor (same cycle):** When `npm run agent:auditor` exits **2**, chief **must** remediate per `agent-auditor` skill — re-run auditor after fix.
-
-If `chief:scan` reports blockers, **do not delegate** until remediated or chief assigns a single remediation owner.
+If `chief:scan` exit 1, **immediately spawn** one remediation owner (orchestrator or pr-fix) with the printed REMEDIATION checklist — do not end the cycle idle.
 
 ## Branch lock registry
 
@@ -61,7 +83,7 @@ Before spawn, assign each `agent/<task>-*` branch to **exactly one** subagent:
 
 ## Worktree policy
 
-- **One active worktree per feature PR** — same branch in two worktrees → pause spawns; one remediation owner consolidates.
+- **One active worktree per feature PR** — same branch in two worktrees → spawn one remediation owner to consolidate; do not idle-report.
 - Before delegating, run `git worktree list`.
 - Do not switch the parent agent's working tree mid-task without chief lock transfer and a scan refresh.
 
@@ -84,7 +106,7 @@ Chief **never** marks session or task "done" until:
 - Orchestrator reports thread closure + merge for delegated PRs, **or**
 - User provides **explicit written waiver** for that specific PR.
 
-Chief does not merge and does not skip `npm run ship:closeout:strict` / `npm run pr:bot-feedback-check`.
+Chief does not merge and does not skip `npm run ship:closeout:strict` / `npm run pr:bot-feedback-check`. While `ship:closeout:strict` exits **2**, delegate one orchestrator cycle — do not spawn parallel fixers on the same PR.
 
 ## Dedupe (orchestrator and chief)
 
@@ -94,24 +116,26 @@ Chief does not merge and does not skip `npm run ship:closeout:strict` / `npm run
 | **30 min** | Resume mid SCAN→PLAN→DELEGATE cycle instead of fresh spawn |
 | **Prompt-only** | Transcripts with user message but zero tool calls — safe to delegate fresh |
 
-## Escalation on clash
+## Remediation protocol (on clash or `chief:scan` exit 1)
 
 When `chief:scan` exit 1, path overlap, worktree duplicate, or branch/PR mismatch:
 
-1. **Pause all spawns** except one remediation owner.
-2. Post short plan: clash type, affected branch/PR/paths, single owner.
-3. Remediation owner fixes; chief re-runs `npm run chief:scan` before resuming.
+1. **Partition** — list dirty paths by intended PR/branch.
+2. **Spawn one remediation owner** (`workflow-orchestrator` or `pr-fix`) with checklist from `chief:scan` REMEDIATION output.
+3. **Record active worker** — name subagent transcript ID in the cycle summary.
+4. **Re-scan after worker returns** — repeat until exit 0 or hard blocker with evidence.
 
-Do not spawn five parallel pr-fix workers — **one orchestrator cycle** per PR unless disjoint PR numbers.
+Do not spawn five parallel pr-fix workers on the **same PR**.
 
 ## Routing (chief assigns; orchestrator executes)
 
 | Concern | Delegate to | Notes |
 |---------|-------------|-------|
-| Ship bar, split PRs, bot wait, merge, verify | **workflow-orchestrator** | One PR per task |
-| Open PR #N review / CI / bots | **pr-fix** + **babysit** skill | Cursor built-in babysit; one worker per PR |
-| Status, exploration, read-only | **explore** subagent | No file edits |
-| Browser QA | **deep-browser-explore** skill | After deploy or for UI tasks |
+| Ship bar, split PRs, bot wait, merge, verify | **workflow-orchestrator** | One PR per task; global mirror check before merge when applicable |
+| Open PR #N review / CI / bots | **pr-fix** + **babysit** | One worker per PR |
+| Browser QA | **deep-browser-explore** | After deploy or for UI tasks |
+| Global sync only | **generalPurpose** sync worker | Push `cursor-global-workflow`; return SHA |
+| Read-only exploration | **explore** | No file edits |
 
 **Orchestrator does not spawn chief.** Chief may spawn orchestrator.
 
@@ -120,6 +144,8 @@ Do not spawn five parallel pr-fix workers — **one orchestrator cycle** per PR 
 ```
 SCAN → LOCK CHECK → PLAN → DELEGATE → (subagent runs) → SCAN → …
 ```
+
+**IDLE** only when: no locks, `chief:scan` exit 0, `ship:closeout:strict` exit 0 or waived, and any global mirror for this cycle is pushed.
 
 ## Delegate prompt template
 
@@ -138,7 +164,8 @@ Return: branch, PR URL, files touched, lock release request, blockers.
 
 ## Related files
 
-- Rule: `~/.cursor/rules/chief-agent-always.mdc`
+- Rule: `~/.cursor/rules/chief-agent-always.mdc`, `global-feature-sync.mdc`
 - Scan: `npm run chief:scan`
+- Auditor: `npm run agent:auditor`, `~/.cursor/skills/agent-auditor/SKILL.md`
 - Orchestrator: `~/.cursor/skills/workflow-orchestrator/SKILL.md`
 - Ship bar: repo `WORKFLOW.md`

@@ -1,0 +1,34 @@
+---
+description: Require mirroring canonical workflow skills/scripts/rules to cursor-global-workflow before done
+alwaysApply: true
+---
+
+# Global feature sync (no drift)
+
+Canonical source of truth for shared agent plumbing: **https://github.com/yanniedog/cursor-global-workflow**
+
+## When this applies
+
+Any change that touches **any** of:
+
+| Category | Paths |
+|----------|--------|
+| Skills | `skills/chief-agent/`, `skills/workflow-orchestrator/`, `skills/deep-browser-explore/`, `skills/agent-auditor/` |
+| User install copies | `~/.cursor/skills/{chief-agent,workflow-orchestrator,deep-browser-explore,agent-auditor}/` |
+| Project copies | `.cursor/skills/{chief-agent,workflow-orchestrator,deep-browser-explore,agent-auditor}/` |
+| Scripts | `wait_for_bots.mjs`, `chief-scan.mjs`, `pr-bot-feedback-check*`, `ship-closeout*`, `agent-auditor-scan*`, `orchestrator-remind*`, `repo-auto-bootstrap.mjs`, `lib/agent-auditor-lib.mjs`, `lib/repo-bootstrap.mjs`, `lib/gh-pr-review-threads.mjs` |
+| Hooks | `hooks/auditor-watch.mjs`, `hooks/orchestrator-remind.mjs` |
+| Shared rules | `rules/chief-agent-always.mdc`, `workflow-orchestrator-always.mdc`, `agent-auditor-always.mdc`, `git-pr-workflow-default.mdc`, `no-early-stop-after-pr.mdc`, `pr-review-bot-replies.mdc`, `respond-to-each-review-comment.mdc`, `multiagent-modularity.mdc`, `workflow-rules-never-overridden.mdc` |
+
+## Required before claiming done
+
+1. **Mirror** the same logical change to `cursor-global-workflow` on branch `main` (or a short-lived sync branch merged promptly).
+2. **Scrub** private paths, hostnames, tokens, and machine-specific usernames from the public commit.
+3. **Commit and push** to `github.com/yanniedog/cursor-global-workflow`; note the SHA in the project PR or handoff.
+4. Re-run **`install.ps1` / `install.sh`** locally when you changed installed artifacts under `~/.cursor/`.
+
+Chief enforces sync when workers touch listed paths. Orchestrator blocks merge on the project PR until global mirror is pushed or chief documents an explicit user waiver for that PR.
+
+## Invoke
+
+Say **"sync global workflow"** or follow `rules/global-feature-sync.mdc` after editing any canonical path above.

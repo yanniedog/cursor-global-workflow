@@ -54,6 +54,16 @@ Partition by **disjoint paths**. If a monolithic PR was opened by mistake: close
 
 Each PR gets the **full** ship bar (steps 1–9 in `WORKFLOW.md`).
 
+## Global mirror check (before merge)
+
+If this PR's diff touches **canonical global features** (see `~/.cursor/rules/global-feature-sync.mdc` or repo `.cursor/rules/global-feature-sync.mdc`):
+
+1. Confirm the same logical change is committed and **pushed** to **https://github.com/yanniedog/cursor-global-workflow** (`main` or merged sync branch).
+2. Record the **global commit SHA** in the project PR body (`Global sync: <sha>`).
+3. If not mirrored: **do not merge** — delegate a sync subagent or implement the mirror in this cycle unless the user waived global sync for this PR in writing.
+
+Chief enforces; orchestrator blocks merge at step 7 until the mirror exists or is waived.
+
 ## Orchestrator loop
 
 ```

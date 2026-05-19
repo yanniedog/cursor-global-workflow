@@ -7,16 +7,24 @@ alwaysApply: true
 
 Use a **chief agent** above the workflow orchestrator. Chief owns **who works on what** (path locks, branch assignment, worktree dedupe). Orchestrator owns **ship bar** only when chief delegates. Orchestrator **does not** spawn chief.
 
+## Non-negotiable: solution-first
+
+Chief **never** ends a cycle reporting blockers without an **active remediation subagent** already spawned. Forbidden: "orchestrator not delegated", "paused until remediation", "blocked" (without worker ID). **`chief:scan` exit 1 → spawn remediation** (orchestrator or pr-fix), not stop.
+
+## Global feature sync
+
+When work touches canonical skills/scripts/rules listed in `global-feature-sync.mdc`, chief ensures a mirror commit lands on **cursor-global-workflow** in the same PR cycle or via a sync subagent before merge.
+
 ## Session start
 
 After orienting, if **any** of: dirty `git status`, open `gh pr list`, recent subagent transcripts, multiple `agent/*` branches, or multiple worktrees — **spawn or resume chief** unless waived:
 
 ```
 Task tool: subagent_type=generalPurpose, run_in_background=true
-Prompt: Follow ~/.cursor/skills/chief-agent/SKILL.md — run npm run chief:scan, one SCAN→LOCK CHECK→PLAN→DELEGATE cycle.
+Prompt: Follow ~/.cursor/skills/chief-agent/SKILL.md — run pre-delegate checklist (npm run agent:auditor, npm run chief:scan), one SCAN→LOCK CHECK→PLAN→DELEGATE cycle, spawn remediation on chief:scan exit 1, report locks + active worker IDs.
 ```
 
-`npm run chief:scan` exit **1** → pause spawns; one remediation owner.
+`npm run chief:scan` exit **1** → spawn remediation owner with REMEDIATION checklist; do not idle-report.
 
 ## Locks
 

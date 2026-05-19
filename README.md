@@ -51,6 +51,25 @@ If double-clicking a folder or a shortcut opens **VS Code** instead of **Cursor*
 
 ---
 
+## Global sync contract
+
+**Canonical source:** [github.com/yanniedog/cursor-global-workflow](https://github.com/yanniedog/cursor-global-workflow)
+
+When you change shared agent plumbing in **any** project, mirror it here **in the same work** (or immediately after) so installs under `~/.cursor/skills/` and `~/.cursor/workflow-scripts/` do not drift.
+
+| Must mirror | Examples |
+|-------------|----------|
+| Skills | `chief-agent`, `workflow-orchestrator`, `deep-browser-explore`, `agent-auditor` |
+| Scripts | `wait_for_bots.mjs`, `chief-scan.mjs`, `pr-bot-feedback-check*`, `ship-closeout*`, `agent-auditor-scan*`, `orchestrator-remind`, `repo-auto-bootstrap.mjs` |
+| Hooks | `auditor-watch.mjs`, `orchestrator-remind.mjs` |
+| Rules | `chief-agent-always`, `workflow-orchestrator-always`, `agent-auditor-always`, ship-bar rules in `rules/` |
+
+**Chief** assigns sync when a worker edits listed paths. **Orchestrator** runs a **global mirror check** before merge when the project PR touches them. Scrub private paths and secrets before pushing.
+
+Rule: `rules/global-feature-sync.mdc` (`alwaysApply: true`). Invoke: **"sync global workflow"**.
+
+---
+
 ## Placeholders (per project)
 
 Configure in the repo's `WORKFLOW.md`, `AGENTS.md`, and `.cursor/project.json`:
@@ -157,6 +176,7 @@ Manual fallback (only if hooks disabled):
 | **chief-agent** skill | Session coordination, path/branch locks, solution-first delegation |
 | **workflow-orchestrator** skill | Ship bar loop, one PR per task, bot wait |
 | **deep-browser-explore** skill | Browser MCP QA with configurable base URL |
+| **agent-auditor** skill | Meta-monitor above chief; transcript/git/scan audit |
 | **babysit** | Use Cursor built-in [`babysit` skill](https://cursor.com) — orchestrator delegates open PR babysitting there |
 | **wait_for_bots.mjs** | Dynamic bot wait gate (step 5) |
 | **chief-scan.mjs** | Pre-delegate repo health scan |
