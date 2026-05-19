@@ -1,26 +1,45 @@
 ---
-description: "Chief delegates ship bar to workflow orchestrator; one PR per task"
+description: "Chief delegates workflow orchestrator for ship bar; one PR per task; no monolithic bundles"
 alwaysApply: true
 ---
 
-# Workflow orchestrator
+# Continuous workflow orchestrator
 
-**Chief first**; chief delegates orchestrator cycles for git/PR/CI/bot wait/merge/verify.
+AR-local uses **chief agent** (coordination) above a **polling orchestrator** (ship bar). Parent agents spawn **chief first**; chief delegates orchestrator cycles. This rule documents orchestrator policy when chief (or the user) invokes it directly.
 
 ## Session start
 
-If dirty tree, open PRs, or recent subagent work — spawn **chief** unless waived. Chief delegates orchestrator when ship bar is needed.
+After orienting to the repo, if **any** of: dirty `git status`, open `gh pr list`, or recent subagent work in agent-transcripts — **spawn or resume chief** (not orchestrator directly) unless the user waived chief for this session:
 
-Manual: **"run workflow orchestrator"** (usually via chief).
-
-## Policy
-
-- One logical task → one branch → one PR.
-- Partition by disjoint paths; never bundle unrelated features.
-- Full ship bar per PR (`WORKFLOW.md` steps 1–9).
-
-```sh
-npm run ship:closeout:strict && npm run wait-for-bots
+```
+Task tool: subagent_type=generalPurpose, run_in_background=true
+Prompt: Follow .cursor/skills/chief-agent/SKILL.md — run one SCAN→LOCK CHECK→PLAN→DELEGATE cycle and report locks + queue. Delegate ship bar to workflow-orchestrator when needed.
 ```
 
-Orchestrator does **not** waive bot wait, thread closure, or `{VERIFY_COMMAND}`.
+Chief dedupes locks and assigns orchestrator for git/PR/Pi work. **Manual orchestrator invoke** (`run workflow orchestrator`) may run orchestrator directly when chief is waived or chief already delegated this turn.
+
+## After substantive subagent work
+
+When a `Task` subagent returns after **implementation**, **ingest**, **dashboard**, **docs**, **PR babysit**, or **orchestrator** cycle:
+
+1. Spawn or resume **chief** (not orchestrator directly) unless chief is in flight or waived.
+2. Chief re-scans, updates locks, and delegates orchestrator or path owners per the chief skill.
+3. When executing orchestrator yourself this turn (chief delegation or user invoke), follow `.cursor/skills/workflow-orchestrator/SKILL.md`.
+
+## One PR per task (hard)
+
+- **Do not** bundle energy ingest, economic data UI, docs, and unrelated banking fixes in one PR.
+- Partition by disjoint file sets; see skill table `agent/energy-dormant-*`, `agent/economic-data-ui-*`, etc.
+- Meta orchestrator plumbing stays its own PR (`agent/workflow-orchestrator-*`).
+
+## Manual invoke
+
+User phrase: **"run workflow orchestrator"** — read `.cursor/skills/workflow-orchestrator/SKILL.md` and run a full cycle (chief may have already delegated).
+
+## Hooks
+
+`subagentStop` / `stop` may inject a follow-up via `.cursor/hooks/orchestrator-remind.mjs` (chief-first; chief delegates orchestrator for ship bar). Treat as signal to run **chief**, not as a substitute for `WORKFLOW.md`.
+
+## Ship bar unchanged
+
+Orchestrator coordinates ship bar when delegated; it does **not** waive `WORKFLOW.md` steps 5–7, bot wait, thread closure, or `verify:local`.

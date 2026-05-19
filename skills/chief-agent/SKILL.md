@@ -37,6 +37,17 @@ Canonical paths: `chief-agent`, `workflow-orchestrator`, `deep-browser-explore`,
 
 Scrub private hostnames, paths, and secrets from the public mirror.
 
+## Drift remediation (chief-owned every cycle)
+
+When **`npm run chief:scan` exit 1** or **`npm run agent:auditor` exit 2**:
+
+1. **Delegate ship bar** — spawn **one** workflow-orchestrator with the printed REMEDIATION checklist (open PRs, thread closure, merge order).
+2. **Global sync (not optional)** — mirror canonical skills/scripts/hooks/rules from the project repo to [cursor-global-workflow](https://github.com/yanniedog/cursor-global-workflow); scrub private hostnames and machine paths; **commit + push** global `main`; run **`install.ps1`** / **`install.sh`** to refresh `~/.cursor/`.
+3. **Project bootstrap** — if `.cursor/rules/00-use-global-workflow.mdc` or `.cursor/workflow-bootstrapped` is missing or older than global `bootstrap-version.txt`, run repo bootstrap (`repo-auto-bootstrap.mjs` or sessionStart hook).
+4. **Re-scan** — `npm run chief:scan` must exit **0** (or one specific human question with evidence) before the chief cycle ends.
+
+Do not return idle while global repo or `~/.cursor/` install lags merged project plumbing.
+
 ## When to run
 
 - **Session start** when multiple agents could conflict (dirty tree, open PRs, recent subagent transcripts, concurrent `agent/*` branches).

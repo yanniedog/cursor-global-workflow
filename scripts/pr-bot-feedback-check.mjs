@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import {
   classifyThreads,
   fetchPullRequestThreads,
   hasGh,
   repoSlug,
 } from './lib/gh-pr-review-threads.mjs';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function sh(cmd) {
   try {
@@ -70,7 +66,7 @@ function printViolations(result) {
 function main() {
   const args = parseArgs(process.argv);
   if (args.help) {
-    console.log(`Usage: node ${join(__dirname, 'pr-bot-feedback-check.mjs')} [--pr N] [--audit-merged] [--limit N] [--json]`);
+    console.log('Usage: node scripts/pr-bot-feedback-check.mjs [--pr N] [--audit-merged] [--limit N] [--json]');
     process.exit(0);
   }
   if (!hasGh()) {

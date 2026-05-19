@@ -1,8 +1,8 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
- * Dynamic pre-merge bot wait gate (WORKFLOW.md step 5).
- * Polls GitHub until CI checks settle and bot review activity is quiet.
- * Exit 0 = ready, 2 = still waiting, 1 = error/timeout.
+ * Dynamic pre-merge bot wait gate (AR-local WORKFLOW.md step 5).
+ * Polls GitHub until CI checks settle and bot review activity is quiet,
+ * or until a safety cap. Exit 0 = ready, 2 = still waiting, 1 = error/timeout.
  */
 import { execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -88,7 +88,7 @@ function parseArgs(argv) {
 }
 
 function statePath(prNumber) {
-  return path.join(repoRoot(), '.git', 'cursor-bot-wait', `${prNumber}.json`);
+  return path.join(repoRoot(), '.git', 'ar-bot-wait', `${prNumber}.json`);
 }
 
 function readState(prNumber) {
@@ -165,6 +165,7 @@ function fetchChecks(prNumber) {
   const r = spawnSync('gh', ['pr', 'checks', String(prNumber), '--json', 'name,bucket,state'], {
     encoding: 'utf8',
   });
+  // gh pr checks exits 8 when checks are still pending (see gh manual).
   if (r.status === 8) return { pending: true };
   if (r.status !== 0) {
     const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
@@ -285,7 +286,7 @@ Poll GitHub until bot review activity is stable (or safety cap).
 
 Options:
   --pr <n>       Pull request number (default: open PR for current branch)
-  --watch, -w    Poll every ${POLL_INTERVAL_SEC}s until ready or cap
+  --watch, -w    Poll every ${POLL_INTERVAL_SEC}s until ready or cap (default: single check)
   --bot-tag      Reset wait anchor to now (after @mentioning bots in PR)
   --since <iso>  Anchor wait window to this timestamp (ISO 8601)
   --help, -h     Show this help
@@ -371,7 +372,7 @@ async function main() {
         `>>> Elapsed ${formatDuration(result.elapsedMs)}; cap remaining ~${formatDuration(result.remainingCapMs)}`,
       );
     }
-    console.log(`>>> PR #${prNumber} — retry: npm run wait-for-bots -- --pr ${prNumber}`);
+    console.log(`>>> PR #${prNumber} ÔÇö retry: npm run wait-for-bots -- --pr ${prNumber}`);
     process.exit(2);
   };
 
