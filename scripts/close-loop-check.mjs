@@ -37,6 +37,7 @@ function ghJson(args) {
 function isPlausibleRepoPath(p) {
   if (/^Node\.js$/i.test(p)) return false;
   if (/^scripts\/foo\./i.test(p)) return false;
+  if (/^(?:chief-agent|workflow-orchestrator)\/SKILL\.md$/i.test(p)) return false;
   if (/^[\w.-]+\.(?:py|mjs|js|md|json)$/i.test(p) && !p.includes('/') && !p.startsWith('.')) {
     return false;
   }
