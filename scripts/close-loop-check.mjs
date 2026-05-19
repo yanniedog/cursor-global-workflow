@@ -61,10 +61,10 @@ function checkPrOnMain(prNumber) {
     'view',
     String(prNumber),
     '--json',
-    'number,title,merged,mergedAt,mergeCommit,headRefOid,headRefName,baseRefOid,commits',
+    'number,title,state,mergedAt,mergeCommit,headRefOid,headRefName,baseRefOid,commits',
   ]);
 
-  if (!pr.merged) {
+  if (pr.state !== 'MERGED' || !pr.mergedAt) {
     return {
       gaps: [
         {
