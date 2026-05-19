@@ -25,6 +25,8 @@ Get-ChildItem -Path (Join-Path $Root 'scripts') -Recurse -File | ForEach-Object 
     Copy-Item -Force $_.FullName $out
 }
 
+Copy-Item -Force (Join-Path $Root 'hooks\orchestrator-remind.mjs') (Join-Path $ScriptsDest 'orchestrator-remind.mjs')
+
 [System.Environment]::SetEnvironmentVariable('CURSOR_WORKFLOW_SCRIPTS', $ScriptsDest, 'User')
 $env:CURSOR_WORKFLOW_SCRIPTS = $ScriptsDest
 

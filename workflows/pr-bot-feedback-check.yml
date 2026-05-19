@@ -22,4 +22,6 @@ jobs:
       - name: Bot feedback thread gate
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/pr-bot-feedback-check.mjs --pr ${{ github.event.pull_request.number }} --quiet
+        run: |
+          SCRIPT="${CURSOR_WORKFLOW_SCRIPTS:-./scripts}/pr-bot-feedback-check.mjs"
+          node "$SCRIPT" --pr ${{ github.event.pull_request.number }} --quiet

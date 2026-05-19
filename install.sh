@@ -18,6 +18,7 @@ done
 cp -f "$ROOT"/rules/*.mdc "$RULES_DEST"/ 2>/dev/null || true
 
 rsync -a --delete "$ROOT/scripts/" "$SCRIPTS_DEST/"
+cp -f "$ROOT/hooks/orchestrator-remind.mjs" "$SCRIPTS_DEST/"
 
 export_line="export CURSOR_WORKFLOW_SCRIPTS=\"${SCRIPTS_DEST}\""
 for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
