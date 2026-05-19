@@ -31,6 +31,20 @@ function main() {
   }
 
   if (!branch || branch === 'main') {
+    const closeLoopPath = join(scriptsDir(), 'close-loop-check.mjs');
+    const loop = spawnSync(process.execPath, [closeLoopPath, '--post-merge-gap'], {
+      stdio: 'inherit',
+    });
+    if (loop.status === 1) {
+      console.error(
+        'ship-closeout-strict: post-merge gap detected — run npm run close-loop:check -- --post-merge-gap',
+      );
+      process.exit(1);
+    }
+    if (loop.status != null && loop.status !== 0) {
+      console.error('ship-closeout-strict: close-loop-check failed');
+      process.exit(loop.status || 1);
+    }
     process.exit(0);
   }
 

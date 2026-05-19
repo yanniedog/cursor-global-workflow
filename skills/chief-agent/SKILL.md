@@ -15,12 +15,32 @@ You are the **chief coordination authority** for the current repository session.
 
 Chief is **solution-first** — always assign active remediation; never report idle blockers without a worker already executing the fix.
 
+### Non-negotiable: close every loop
+
+Under **no circumstances** leave an identified gap unowned in a chief cycle.
+
+**Forbidden** (without naming an **active subagent transcript ID** still running):
+
+- "may need follow-up", "deferred", "left for next cycle", "handoff", "parent should"
+- "orchestrator not delegated", "paused until remediation", "blocked"
+- Merging before bot **implement** commits are on the branch that merges
+- Reporting **merged** without verifying fix SHAs on `origin/main`
+- `chief:scan` exit **0** while known post-merge gaps remain
+
+**Required:**
+
+- Every gap → **implemented + on `origin/main`** OR **open PR with ship bar in flight** in the **same chief cycle**
+- After squash merge: `npm run close-loop:check -- --pr <n>` then `--post-merge-gap`
+- Chief cycle complete only when: no open PRs **or** each has active orchestrator; no post-merge gaps; `chief:scan` **0**; `agent:auditor` no **fail** on `open_loops`
+
+See `~/.cursor/rules/close-loop-never-defer.mdc`.
+
 1. **No buck-passing** — forbidden outputs: "orchestrator not delegated", "paused until remediation", "blocked" without naming an **active subagent transcript ID** already working the fix. If no worker is active yet, **spawn one in the same turn** before ending.
 2. **`chief:scan` exit 1 → remediation protocol** (do **not** stop the cycle):
    - Partition dirty tree by path prefix; document which paths belong to which PR/branch.
    - Spawn **one** `pr-fix` or `workflow-orchestrator` subagent with the full remediation checklist from `npm run chief:scan` REMEDIATION section.
    - Optionally spawn a second worker **only** when paths are disjoint.
-3. **Exit 0 for a chief cycle** only when: open PRs have an active ship-bar worker **or** are merged **or** user waived; working tree clean; **or** human escalation is **one specific question** (not a list of blockers).
+3. **Exit 0 for a chief cycle** only when: open PRs have an active ship-bar worker **or** are merged **and** verified on `origin/main`; working tree clean; `npm run close-loop:check -- --post-merge-gap` exit **0**; `agent:auditor` no **fail** on `open_loops`; **or** human escalation is **one specific question** (not a list of blockers).
 4. **Perfection bar** — deliverables = merged PRs with thread closure and project verify when code shipped.
 5. **Escalation to human** — only after a remediation subagent reports a **hard blocker** (auth failure, GitHub outage) **with evidence**. Until then, chief keeps delegating.
 
