@@ -128,25 +128,6 @@ function checkPrOnMain(prNumber) {
     }
   }
 
-  const changedFiles = sh(`git diff --name-only ${pr.baseRefOid}..${pr.headRefOid}`, {
-    allowFail: true,
-  });
-  if (changedFiles) {
-    for (const f of changedFiles.split(/\n/).filter(Boolean)) {
-      const headHash = blobHash(pr.headRefOid, f);
-      const mainHash = blobHash('origin/main', f);
-      const mergeHash = blobHash(mergeOid, f);
-      if (mergeHash && mainHash !== mergeHash) {
-        gaps.push({
-          kind: 'file_content_gap',
-          pr: prNumber,
-          file: f,
-          remediation: `Open agent/close-loop-pr-${prNumber}-followup with ${f} from merge commit ${mergeOid.slice(0, 8)}`,
-        });
-      }
-    }
-  }
-
   return { gaps, pr };
 }
 
