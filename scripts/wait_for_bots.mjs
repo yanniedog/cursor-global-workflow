@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+ï»¿#!/usr/bin/env node
 /**
  * Dynamic pre-merge bot wait gate (WORKFLOW.md step 5).
  * Exit 0 only when CI is settled, every required bot has posted since anchor,
@@ -13,8 +13,9 @@ import {
   allKnownBotLogins,
   formatRequiredKeys,
   missingRequiredKeys,
+  parseRequiredKeys,
   resolveRequiredKeys,
-} from './lib/bot-wait-config.mjs';
+} from './scripts/lib/bot-wait-config.mjs';
 
 const POLL_INTERVAL_SEC = Number(process.env.BOT_WAIT_POLL_SEC || 45);
 const QUIET_WINDOW_SEC = Number(process.env.BOT_WAIT_QUIET_SEC || 90);
@@ -84,13 +85,9 @@ function parseArgs(argv) {
     else if ((a === '--since' || a === '--anchor') && argv[i + 1]) out.since = argv[++i];
     else if (a.startsWith('--since=') || a.startsWith('--anchor=')) out.since = a.split('=').slice(1).join('=');
     else if (a === '--require-bots' && argv[i + 1]) {
-      out.requireBots = argv[++i].split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+      out.requireBots = parseRequiredKeys(argv[++i]);
     } else if (a.startsWith('--require-bots=')) {
-      out.requireBots = a
-        .slice('--require-bots='.length)
-        .split(',')
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean);
+      out.requireBots = parseRequiredKeys(a.slice('--require-bots='.length));
     }
   }
   return out;
@@ -179,6 +176,15 @@ function ignoredCheckNames() {
   );
 }
 
+/** Match full `gh pr checks` name or trailing job segment (e.g. `workflow / job`). */
+function checkNameMatchesIgnore(checkName, ignore) {
+  const lower = (checkName || '').toLowerCase();
+  if (ignore.has(lower)) return true;
+  const slash = lower.lastIndexOf('/');
+  const tail = slash >= 0 ? lower.slice(slash + 1).trim() : lower;
+  return ignore.has(tail);
+}
+
 function fetchChecks(prNumber) {
   const r = spawnSync('gh', ['pr', 'checks', String(prNumber), '--json', 'name,bucket,state'], {
     encoding: 'utf8',
@@ -196,8 +202,7 @@ function fetchChecks(prNumber) {
     const pending =
       Array.isArray(checks) &&
       checks.some((c) => {
-        const name = (c.name || '').toLowerCase();
-        if (ignore.has(name)) return false;
+        if (checkNameMatchesIgnore(c.name, ignore)) return false;
         return c.bucket === 'pending';
       });
     return { pending };
@@ -235,7 +240,8 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
   );
   const seenLogins = [...new Set(botEventsSinceAnchor.map((e) => e.login))];
   const missing = missingRequiredKeys(requiredKeys, seenLogins);
-  const allRequiredPosted = missing.length === 0;
+  const allRequiredPosted =
+    requiredKeys.length > 0 && botEventsSinceAnchor.length > 0 && missing.length === 0;
   const lastBotAt =
     botEventsSinceAnchor.length > 0
       ? new Date(botEventsSinceAnchor[botEventsSinceAnchor.length - 1].at)
@@ -299,10 +305,14 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
   if (missing.length) {
     waitParts.push(`waiting for required bot(s): ${missing.join(', ')} (${formatRequiredKeys(missing)})`);
   }
-  if (allRequiredPosted && !quiet && lastBotAt) {
-    waitParts.push(
-      `need ${QUIET_WINDOW_SEC}s quiet after last bot (last activity ${formatDuration(Date.now() - lastBotAt.getTime())} ago)`,
-    );
+  if (allRequiredPosted && !quiet) {
+    if (lastBotAt) {
+      waitParts.push(
+        `need ${QUIET_WINDOW_SEC}s quiet after last bot (last activity ${formatDuration(Date.now() - lastBotAt.getTime())} ago)`,
+      );
+    } else {
+      waitParts.push(`need ${QUIET_WINDOW_SEC}s quiet after required bots post`);
+    }
   }
   if (!minElapsed) {
     waitParts.push(`${Math.ceil((MIN_WAIT_SEC * 1000 - elapsedMs) / 1000)}s until minimum wait`);
@@ -335,8 +345,8 @@ Options:
 Exit codes: 0 ready | 2 still waiting | 1 error or required bots missing at cap (DO NOT MERGE)
 
 Env: BOT_WAIT_POLL_SEC, BOT_WAIT_QUIET_SEC, BOT_WAIT_MIN_SEC, BOT_WAIT_MAX_MIN,
-     AR_BOT_WAIT_REQUIRED (or BOT_WAIT_REQUIRED) — comma-separated bot keys
-     BOT_WAIT_IGNORE_CHECK_NAMES — comma-separated gh pr checks names to ignore (CI self-gate)
+     AR_BOT_WAIT_REQUIRED (or BOT_WAIT_REQUIRED) â€” comma-separated bot keys
+     BOT_WAIT_IGNORE_CHECK_NAMES â€” comma-separated gh pr checks names to ignore (CI self-gate)
 
 Required bots: ${formatRequiredKeys(requiredKeys)}
 `);
@@ -402,7 +412,18 @@ async function main() {
     writeState(prNumber, state);
   }
 
-  const effectiveRequired = state.requiredKeys || requiredKeys;
+  const cliOverride = args.requireBots !== null;
+  const envOverride = Boolean(process.env.AR_BOT_WAIT_REQUIRED || process.env.BOT_WAIT_REQUIRED);
+  const effectiveRequired =
+    cliOverride || envOverride ? requiredKeys : state.requiredKeys || requiredKeys;
+  if (
+    state.requiredKeys &&
+    JSON.stringify(state.requiredKeys) !== JSON.stringify(effectiveRequired)
+  ) {
+    state.requiredKeys = effectiveRequired;
+    state.readyAt = null;
+    writeState(prNumber, state);
+  }
 
   const finish = (result) => {
     const st = readState(prNumber) || state;
@@ -418,7 +439,7 @@ async function main() {
     if (result.status === 'timeout' || result.status === 'error') {
       console.error(`>>> BOT WAIT ${result.status.toUpperCase()}: ${result.message}`);
       if (result.missing?.length) {
-        console.error(`>>> Missing required bots: ${result.missing.join(', ')}  merge is blocked.`);
+        console.error(`>>> Missing required bots: ${result.missing.join(', ')} â€” merge is blocked.`);
       }
       process.exit(1);
     }
@@ -428,7 +449,7 @@ async function main() {
         `>>> Elapsed ${formatDuration(result.elapsedMs)}; cap remaining ~${formatDuration(result.remainingCapMs)}`,
       );
     }
-    console.log(`>>> PR #${prNumber}  retry: npm run wait-for-bots -- --pr ${prNumber}`);
+    console.log(`>>> PR #${prNumber} â€” retry: npm run wait-for-bots -- --pr ${prNumber}`);
     process.exit(2);
   };
 
