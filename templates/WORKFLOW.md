@@ -66,7 +66,7 @@ npm run pr:bot-feedback-check -- --pr <n>
 
 ### 7. Merge
 
-`gh pr merge --squash` only after steps 5–6 **and** GitHub checks **`bot-presence-gate`** + **`pr-bot-feedback-check`** are green (when branch protection is enabled).
+**Default:** `npm run pr:merge -- --pr <n>` (`gh pr merge --auto --squash --delete-branch`) only after steps 5–6 **and** GitHub checks **`bot-presence-gate`** + **`pr-bot-feedback-check`** are green (when branch protection is enabled). See **`templates/MERGE_POLICY.md`**.
 
 **Close without merge:** GitHub cannot block "Close pull request". Agents must not close without merge unless waived; `npm run agent:auditor` flags closed-unmerged PRs with open bot threads.
 

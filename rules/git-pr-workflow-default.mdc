@@ -18,7 +18,7 @@ Every repo change: `agent/<slug>` branch → PR to `main` → CI → wait gate �
 5. `npm run wait-for-bots` after new PR or `--bot-tag`.
 5b. Synthesize threads → `## Feedback plan` → one push → in-thread replies.
 6. Thread closure on every substantive thread.
-7. Merge after 5–6 and `pr:bot-feedback-check` exit **0**.
+7. Merge after 5–6 and `pr:bot-feedback-check` exit **0** (`npm run pr:merge` / `gh pr merge --auto --squash --delete-branch`).
 8. Run `{DEPLOY_COMMAND}` so running code matches `main`.
 9. Run `{VERIFY_COMMAND}`; exit **0**. Browser MCP for UI when needed.
 

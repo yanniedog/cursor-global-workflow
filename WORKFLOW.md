@@ -77,7 +77,9 @@ npm run pr:bot-feedback-check -- --pr <n>
 
 ### 7. Merge
 
-`gh pr merge --squash` — only after steps 5–6 and bot-feedback-check exit **0**.
+**Default:** **`npm run pr:merge -- --pr <n>`** once steps 5–6 are done and threads are closed — runs `gh pr merge --auto --squash --delete-branch`. Auto-merge lands the PR when required checks pass. Squash is merge-time only (`gh pr create` does not set merge method). See **`templates/MERGE_POLICY.md`** (copy to `.github/MERGE_POLICY.md` in consuming repos).
+
+Merge only after steps 5–6 **and** `npm run pr:bot-feedback-check -- --pr <n>` exit **0**.
 
 ### 8. Deploy / dev server confirmed
 
