@@ -123,8 +123,8 @@ function printRemediation({
   prs,
   branch,
 }) {
-  console.log('\nREMEDIATION (chief must spawn orchestrator or pr-fix with this checklist):');
-  console.log('  Chief: spawn ONE workflow-orchestrator or pr-fix subagent now — do not end cycle idle.');
+  console.log('\nREMEDIATION (chief must spawn one pr-fix/babysit per open PR; orchestrator only for split/routing):');
+  console.log('  Chief: spawn one pr-fix/babysit worker per open PR now — do not end cycle idle.');
 
   if (dirtyMain) {
     console.log('\n  [dirty main]');

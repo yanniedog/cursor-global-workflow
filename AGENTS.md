@@ -18,11 +18,12 @@ Scrub private hostnames, machine paths, and secrets from public commits.
 
 | Skill | Path | Invoke |
 |-------|------|--------|
-| **Chief agent** | `skills/chief-agent/SKILL.md` | "run chief agent" — coordination, locks, solution-first delegation |
-| **Workflow orchestrator** | `skills/workflow-orchestrator/SKILL.md` | "run workflow orchestrator" — ship bar, one PR per task |
+| **Chief agent** | `skills/chief-agent/SKILL.md` | "run chief agent" — coordination, locks; spawns **one pr-fix/babysit per open PR** |
+| **Workflow orchestrator** | `skills/workflow-orchestrator/SKILL.md` | "run workflow orchestrator" — queue coordination, splits, routing; spawns pr-fix per PR |
+| **PR fix** | `skills/pr-fix-agent/SKILL.md` | "run pr fix" — **one dedicated worker per open PR:** threads, CI, synthesis, gates, squash merge |
 | **Deep browser explore** | `skills/deep-browser-explore/SKILL.md` | Browser MCP QA; base URL from `.cursor/project.json` or env |
 | **Agent auditor** | `skills/agent-auditor/SKILL.md` | Meta-monitor above chief; `npm run agent:auditor` |
-| **Babysit (PR)** | Cursor built-in | Orchestrator delegates open PR #N to **babysit** skill (`~/.cursor/skills-cursor/babysit/SKILL.md`) |
+| **Babysit (PR)** | Cursor built-in | pr-fix workers use **babysit** skill (`~/.cursor/skills-cursor/babysit/SKILL.md`) for triage patterns |
 
 ## Rules (user-global)
 
