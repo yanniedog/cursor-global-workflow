@@ -18,6 +18,11 @@ const NPM_STUBS = {
   'chief:scan': 'chief-scan.mjs',
   'pr:bot-feedback-check': 'pr-bot-feedback-check.mjs',
   'pr:bot-feedback-audit': 'pr-bot-feedback-check.mjs --audit-merged --limit 20',
+  'pr:gates:check': 'pr-gates-check.mjs',
+  'pr:watch-once': 'pr-watch-once.mjs',
+  'pr:queue:drive': 'pr-queue-drive.mjs',
+  'pr:update-branch': 'pr-update-branch.mjs',
+  'pr:merge': 'pr-merge.mjs',
   'ship:closeout:strict': 'ship-closeout-strict.mjs',
   'git:graph-hygiene': null,
 };

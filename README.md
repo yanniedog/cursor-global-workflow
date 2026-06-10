@@ -129,6 +129,11 @@ Add npm scripts (merge into existing `package.json`):
     "chief:scan": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\chief-scan.mjs\"",
     "pr:bot-feedback-check": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-bot-feedback-check.mjs\"",
     "pr:bot-feedback-audit": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-bot-feedback-check.mjs\" --audit-merged --limit 20",
+    "pr:gates:check": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-gates-check.mjs\"",
+    "pr:watch-once": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-watch-once.mjs\"",
+    "pr:queue:drive": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-queue-drive.mjs\"",
+    "pr:update-branch": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-update-branch.mjs\"",
+    "pr:merge": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-merge.mjs\"",
     "ship:closeout:strict": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\ship-closeout-strict.mjs\"",
     "git:graph-hygiene": "git fetch origin --prune"
   }

@@ -68,7 +68,23 @@ npm run pr:bot-feedback-check -- --pr <n>
 
 **Default:** `npm run pr:merge -- --pr <n>` (`gh pr merge --auto --squash --delete-branch`) only after steps 5–6 **and** GitHub checks **`bot-presence-gate`** + **`pr-bot-feedback-check`** are green (when branch protection is enabled). See **`templates/MERGE_POLICY.md`**.
 
+**Enable auto-merge on PR open:** `npm run pr:merge -- --pr <n> --enable-only` (skip branch sync).
+
 **Close without merge:** GitHub cannot block "Close pull request". Agents must not close without merge unless waived; `npm run agent:auditor` flags closed-unmerged PRs with open bot threads.
+
+### 7.1 PR queue efficiency (agents)
+
+One pr-fix worker per open PR owns the full loop to squash merge.
+
+| Step | Command |
+|------|---------|
+| PR opens | `npm run pr:merge -- --pr <n> --enable-only` |
+| Queue scan | `npm run pr:queue:drive` or `npm run pr:watch-once` |
+| Bot wait | `npm run wait-for-bots -- --pr <n>` (parallel per PR via `pr:queue:drive --parallel-wait`) |
+| Branch sync | `npm run pr:update-branch -- --pr <n> --progress` |
+| Gates | `npm run pr:gates:check -- --pr <n>` |
+
+Gate-exempt chore PRs (generated artifacts only under `reports/` or `AR_PR_GATE_EXEMPT_PREFIXES`): bot wait and thread gates skip automatically.
 
 ### 8. Deploy / restart
 

@@ -48,6 +48,11 @@ Installed to `~/.cursor/workflow-scripts/`; env `CURSOR_WORKFLOW_SCRIPTS` points
 | `wait-for-bots` | `wait_for_bots.mjs` |
 | `chief:scan` | `chief-scan.mjs` |
 | `pr:bot-feedback-check` | `pr-bot-feedback-check.mjs` |
+| `pr:gates:check` | `pr-gates-check.mjs` |
+| `pr:watch-once` | `pr-watch-once.mjs` |
+| `pr:queue:drive` | `pr-queue-drive.mjs` |
+| `pr:update-branch` | `pr-update-branch.mjs` |
+| `pr:merge` | `pr-merge.mjs` |
 | `ship:closeout:strict` | `ship-closeout-strict.mjs` |
 | `agent:auditor` | `agent-auditor-scan.mjs` |
 
