@@ -10,7 +10,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { platform } from 'node:os';
 
 const NPM_STUBS = {
@@ -110,6 +110,22 @@ function patchPackageJson(pkgPath, scriptsRoot) {
   return { patched: true, added };
 }
 
+function copyTemplateIfMissing(src, dest, relDest, result) {
+  if (!existsSync(src) || existsSync(dest)) return false;
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(src, dest);
+  result.files.push(relDest);
+  return true;
+}
+
+function copyTemplateAlways(src, dest, relDest, result) {
+  if (!existsSync(src)) return false;
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(src, dest);
+  if (!result.files.includes(relDest)) result.files.push(relDest);
+  return true;
+}
+
 /**
  * @param {string} workspaceRoot
  * @param {{ dryRun?: boolean }} [opts]
@@ -162,8 +178,24 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
   const templatesDir = join(scriptsRoot, 'templates');
   const ruleTemplate = join(templatesDir, '00-use-global-workflow.mdc');
   const workflowTemplate = join(templatesDir, 'WORKFLOW.md');
+  const cursorReviewWorkflowTemplate = join(
+    templatesDir,
+    '.github',
+    'workflows',
+    'cursor-auto-pr-review.yml',
+  );
+  const cursorReviewPromptTemplate = join(templatesDir, '.cursor', 'PR_REVIEW_PROMPT.md');
+  const cursorCliConfigTemplate = join(templatesDir, '.cursor', 'cli.json');
   const ruleDest = join(rulesDir, '00-use-global-workflow.mdc');
   const workflowDest = join(workspaceRoot, 'WORKFLOW.md');
+  const cursorReviewWorkflowDest = join(
+    workspaceRoot,
+    '.github',
+    'workflows',
+    'cursor-auto-pr-review.yml',
+  );
+  const cursorReviewPromptDest = join(cursorDir, 'PR_REVIEW_PROMPT.md');
+  const cursorCliConfigDest = join(cursorDir, 'cli.json');
 
   if (dryRun) {
     result.bootstrapped = true;
@@ -186,6 +218,28 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
     copyFileSync(workflowTemplate, workflowDest);
     result.files.push('WORKFLOW.md');
   }
+
+  copyTemplateIfMissing(
+    cursorReviewWorkflowTemplate,
+    cursorReviewWorkflowDest,
+    '.github/workflows/cursor-auto-pr-review.yml',
+    result,
+  );
+  if (markerVersion !== null) {
+    copyTemplateAlways(
+      cursorReviewWorkflowTemplate,
+      cursorReviewWorkflowDest,
+      '.github/workflows/cursor-auto-pr-review.yml',
+      result,
+    );
+  }
+  copyTemplateIfMissing(
+    cursorReviewPromptTemplate,
+    cursorReviewPromptDest,
+    '.cursor/PR_REVIEW_PROMPT.md',
+    result,
+  );
+  copyTemplateIfMissing(cursorCliConfigTemplate, cursorCliConfigDest, '.cursor/cli.json', result);
 
   const pkgPath = join(workspaceRoot, 'package.json');
   result.packageJson = patchPackageJson(pkgPath, scriptsRoot);

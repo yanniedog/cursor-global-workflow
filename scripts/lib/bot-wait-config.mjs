@@ -1,6 +1,6 @@
 /**
  * Required-bot aliases for wait-for-bots and pr-bot-feedback-check.
- * Keys are short names (gemini, codex, sourcery); values are GitHub logins to match.
+ * Keys are short names (gemini, codex, sourcery, cursor); values are GitHub logins to match.
  */
 export const BOT_ALIASES = {
   gemini: [
@@ -11,15 +11,21 @@ export const BOT_ALIASES = {
   ],
   codex: ['chatgpt-codex-connector', 'chatgpt-codex-connector[bot]'],
   sourcery: ['sourcery-ai', 'sourcery-ai[bot]'],
+  cursor: ['github-actions[bot]'],
 };
 
 export const DEFAULT_REQUIRED_KEYS = ['gemini', 'codex', 'sourcery'];
 
 export const OPTIONAL_BOT_LOGINS = [
+  'github-actions[bot]',
   'copilot-pull-request-reviewer[bot]',
   'coderabbitai[bot]',
   'greptile-apps[bot]',
 ];
+
+export function isCursorAutoReviewBody(bodyRaw) {
+  return /<!--\s*cursor-auto-review\s*-->/i.test(String(bodyRaw || ''));
+}
 
 export function parseRequiredKeys(raw) {
   if (!raw || !String(raw).trim()) return [...DEFAULT_REQUIRED_KEYS];

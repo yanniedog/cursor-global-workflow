@@ -60,10 +60,11 @@ Get-ChildItem -Path (Join-Path $Root 'hooks') -Filter '*.mjs' | ForEach-Object {
 
 Copy-Item -Force (Join-Path $Root 'bootstrap-version.txt') (Join-Path $ScriptsDest 'bootstrap-version.txt')
 
-Get-ChildItem -Path (Join-Path $Root 'templates') -File | ForEach-Object {
-
-    Copy-Item -Force $_.FullName (Join-Path $TemplatesDest $_.Name)
-
+Get-ChildItem -Path (Join-Path $Root 'templates') -Recurse -File | ForEach-Object {
+    $rel = $_.FullName.Substring((Join-Path $Root 'templates').Length + 1)
+    $out = Join-Path $TemplatesDest $rel
+    New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
+    Copy-Item -Force $_.FullName $out
 }
 
 

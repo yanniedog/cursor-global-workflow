@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 const BOT_LOGIN_RE =
   /(?:gemini|codex|sourcery|coderabbit|copilot|greptile|chatgpt|github-actions\[bot\])/i;
+const CURSOR_AUTO_REVIEW_RE = /<!--\s*cursor-auto-review\s*-->/i;
 
 const CLOSURE_BODY_RE =
   /\b(implemented|deferred|declined|won't fix|wontfix|post-merge|not applicable|n\/a)\b/i;
@@ -119,8 +120,8 @@ export function fetchPullRequestThreads(owner, name, prNumber) {
 
 function threadHasOwnerClosure(comments, botAt) {
   for (const c of comments.slice(1)) {
-    const login = c.author.login;
-    if (isBotLogin(login) && c.author.__typename === 'Bot') continue;
+    const { login, __typename } = c.author;
+    if (isBotLogin(login) && __typename === 'Bot') continue;
     if (new Date(c.createdAt).getTime() < botAt) continue;
     if (isClosureReply(c.body)) return true;
   }
@@ -139,6 +140,9 @@ export function classifyThreads(threads, opts = {}) {
 
     const first = comments[0];
     const starterLogin = first.author.login;
+    if (starterLogin.toLowerCase() === 'github-actions[bot]' && !CURSOR_AUTO_REVIEW_RE.test(first.body || '')) {
+      continue;
+    }
     const starterIsBot = isBotLogin(starterLogin) || first.author.__typename === 'Bot';
     const excerpt = (first.body || '').replace(/\s+/g, ' ').slice(0, 120);
     const botAt = new Date(first.createdAt).getTime();
@@ -148,8 +152,7 @@ export function classifyThreads(threads, opts = {}) {
         : false;
 
     if (!t.isResolved) {
-      // mergedAudit: ignore unresolved non-bot threads only; unresolved bot threads still fail.
-      if (mergedAudit && !starterIsBot) continue;
+      if (mergedAudit && (hasClosure || !starterIsBot)) continue;
       violations.push({
         threadIndex: i + 1,
         kind: 'unresolved',

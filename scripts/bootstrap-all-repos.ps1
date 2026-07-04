@@ -46,12 +46,30 @@ foreach ($r in $results) {
     Push-Location $ws
     try {
         $toAdd = @()
-        if (Test-Path '.cursor\rules\00-use-global-workflow.mdc') {
-            $toAdd += '.cursor/rules/00-use-global-workflow.mdc'
+        $cursorPaths = @(
+            '.cursor/rules/00-use-global-workflow.mdc',
+            '.cursor/workflow-bootstrapped',
+            '.cursor/PR_REVIEW_PROMPT.md',
+            '.cursor/cli.json',
+            '.github/workflows/cursor-auto-pr-review.yml'
+        )
+        foreach ($rel in $cursorPaths) {
+            if (Test-Path ($rel -replace '/', '\')) { $toAdd += $rel }
         }
-        if (Test-Path '.cursor\workflow-bootstrapped') {
-            $toAdd += '.cursor/workflow-bootstrapped'
+        if (Test-Path 'WORKFLOW.md') {
+            $wf = git status --porcelain -- WORKFLOW.md 2>$null
+            if ($wf) { $toAdd += 'WORKFLOW.md' }
         }
+        if (Test-Path 'package.json') {
+            $pkg = git status --porcelain -- package.json 2>$null
+            if ($pkg) { $toAdd += 'package.json' }
+        }
+        if ($r.files) {
+            foreach ($f in $r.files) {
+                if ($toAdd -notcontains $f) { $toAdd += $f }
+            }
+        }
+        $toAdd = $toAdd | Select-Object -Unique
         if ($toAdd.Count -eq 0) { continue }
 
         $status = git status --porcelain -- $toAdd 2>$null
@@ -61,7 +79,7 @@ foreach ($r in $results) {
         }
 
         git add @toAdd
-        git commit -m "chore: add cursor-global-workflow bootstrap"
+        git commit -m "chore: add Cursor Auto PR review workflow (Pro+ Auto quota)"
         $committed++
         Write-Host "     commit: done"
 
@@ -80,3 +98,4 @@ foreach ($r in $results) {
 
 Write-Host ""
 Write-Host "Summary: bootstrapped=$bootstrapped skipped=$skipped committed=$committed total=$($results.Count)"
+Write-Host "Tip: run setup-cursor-pr-review.ps1 to set CURSOR_API_KEY on all repos."

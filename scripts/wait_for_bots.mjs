@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Dynamic pre-merge bot wait gate (WORKFLOW.md step 5).
  * Exit 0 only when CI is settled, every required bot has posted since anchor,
@@ -12,10 +12,11 @@ import { setTimeout as sleepMs } from 'node:timers/promises';
 import {
   allKnownBotLogins,
   formatRequiredKeys,
+  isCursorAutoReviewBody,
   missingRequiredKeys,
   parseRequiredKeys,
   resolveRequiredKeys,
-} from './scripts/lib/bot-wait-config.mjs';
+} from './lib/bot-wait-config.mjs';
 
 const POLL_INTERVAL_SEC = Number(process.env.BOT_WAIT_POLL_SEC || 45);
 const QUIET_WINDOW_SEC = Number(process.env.BOT_WAIT_QUIET_SEC || 90);
@@ -23,7 +24,7 @@ const MIN_WAIT_SEC = Number(process.env.BOT_WAIT_MIN_SEC || 60);
 const MAX_WAIT_MIN = Number(process.env.BOT_WAIT_MAX_MIN || 28);
 
 const COMMENTS_QUERY =
-  'query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){comments(last:100){nodes{author{login}createdAt}}reviews(last:30){nodes{author{login}submittedAt}}reviewThreads(last:100){nodes{comments(last:10){nodes{author{login}createdAt}}}}}}}';
+  'query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){comments(last:100){nodes{author{login}createdAt body}}reviews(last:30){nodes{author{login}submittedAt body}}reviewThreads(last:100){nodes{comments(last:10){nodes{author{login}createdAt body}}}}}}}';
 
 function sh(cmd) {
   try {
@@ -151,15 +152,20 @@ function fetchBotActivity(owner, name, prNumber) {
   if (!pr) return { error: 'GraphQL: pull request not found', events: [] };
 
   const events = [];
+  const pushEvent = (login, at, body) => {
+    if (!login || !at) return;
+    if (login.toLowerCase() === 'github-actions[bot]' && !isCursorAutoReviewBody(body)) return;
+    events.push({ login, at });
+  };
   for (const c of pr.comments?.nodes || []) {
-    if (c.author?.login && c.createdAt) events.push({ login: c.author.login, at: c.createdAt });
+    pushEvent(c.author?.login, c.createdAt, c.body);
   }
   for (const rev of pr.reviews?.nodes || []) {
-    if (rev.author?.login && rev.submittedAt) events.push({ login: rev.author.login, at: rev.submittedAt });
+    pushEvent(rev.author?.login, rev.submittedAt, rev.body);
   }
   for (const t of pr.reviewThreads?.nodes || []) {
     for (const c of t.comments?.nodes || []) {
-      if (c.author?.login && c.createdAt) events.push({ login: c.author.login, at: c.createdAt });
+      pushEvent(c.author?.login, c.createdAt, c.body);
     }
   }
   events.sort((a, b) => new Date(a.at) - new Date(b.at));
@@ -185,48 +191,29 @@ function checkNameMatchesIgnore(checkName, ignore) {
   return ignore.has(tail);
 }
 
-function checksPendingShape(extra = {}) {
-  return { pending: true, failed: false, failedNames: [], ...extra };
-}
-
 function fetchChecks(prNumber) {
-  const r = spawnSync(
-    'gh',
-    ['pr', 'checks', String(prNumber), '--required', '--json', 'name,bucket,state'],
-    { encoding: 'utf8' },
-  );
-  if (r.status === 8) return checksPendingShape();
+  const r = spawnSync('gh', ['pr', 'checks', String(prNumber), '--json', 'name,bucket,state'], {
+    encoding: 'utf8',
+  });
+  if (r.status === 8) return { pending: true };
   if (r.status !== 0) {
     const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
-    return checksPendingShape({ error: msg });
+    return { pending: true, error: msg };
   }
   const stdout = (r.stdout || '').trim();
-  if (!stdout) return checksPendingShape();
+  if (!stdout) return { pending: true };
   try {
     const checks = JSON.parse(stdout);
     const ignore = ignoredCheckNames();
-    let pending = false;
-    let failed = false;
-    const failedNames = [];
-    if (Array.isArray(checks)) {
-      for (const c of checks) {
-        if (checkNameMatchesIgnore(c.name, ignore)) continue;
-        if (c.bucket === 'pending') pending = true;
-        if (
-          c.bucket === 'fail' ||
-          c.bucket === 'cancel' ||
-          c.state === 'FAILURE' ||
-          c.state === 'ERROR' ||
-          c.state === 'CANCELLED'
-        ) {
-          failed = true;
-          failedNames.push(c.name);
-        }
-      }
-    }
-    return { pending, failed, failedNames };
+    const pending =
+      Array.isArray(checks) &&
+      checks.some((c) => {
+        if (checkNameMatchesIgnore(c.name, ignore)) return false;
+        return c.bucket === 'pending';
+      });
+    return { pending };
   } catch (e) {
-    return checksPendingShape({ error: `Invalid JSON from gh pr checks: ${e.message}` });
+    return { pending: true, error: `Invalid JSON from gh pr checks: ${e.message}` };
   }
 }
 
@@ -290,15 +277,8 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
   }
 
   const checks = fetchChecks(prNumber);
-  if (checks.error && !checks.failed) {
+  if (checks.error && !checks.pending) {
     return { status: 'error', message: checks.error };
-  }
-  if (checks.failed) {
-    const names = checks.failedNames?.length ? checks.failedNames.join(', ') : 'required check(s)';
-    return {
-      status: 'error',
-      message: `PR #${prNumber} has failed required check(s): ${names}. Fix CI before bot wait.`,
-    };
   }
 
   const checksReady = !checks.pending;

@@ -31,7 +31,7 @@ Commit only on the topic branch. `git push -u origin HEAD`.
 
 `gh pr checks <n> --watch` until required checks pass. Fix forward on this PR. After fix pushes, `@mention` reviewers using handles from `gh pr view -c`.
 
-**Required GitHub status checks (when branch protection is enabled):** `bot-presence-gate`, `pr-bot-feedback-check`. Apply: `npm run branch-protection:apply`.
+**Required GitHub status checks (when branch protection is enabled):** `bot-presence-gate`, `pr-bot-feedback-check`. Cursor Auto Review may also appear as advisory check `cursor-auto-review`. Apply: `npm run branch-protection:apply`.
 
 ### 5. Bot wait trigger (dynamic)
 
@@ -46,11 +46,11 @@ Run after creating a new PR (or after tagging bots). Exit **2** = still waiting,
 **Ready when** (since wait anchor — PR creation or `--bot-tag`):
 
 - Required CI checks are not pending, **and**
-- **Every required bot** has posted since the anchor (default: **gemini**, **codex**, **sourcery**), **and**
+- **Every required bot** has posted since the anchor (default: **gemini**, **codex**, **sourcery**; optional: **cursor** via Cursor Auto Review), **and**
 - **90s** quiet window after last bot activity, **and**
 - At least **60s** since anchor
 
-Override: `AR_BOT_WAIT_REQUIRED=gemini,codex,sourcery` or `--require-bots`. If required bots never post before the safety cap, exit **1** — **DO NOT MERGE**.
+Override: `AR_BOT_WAIT_REQUIRED=gemini,codex,sourcery` or `--require-bots`. Add `cursor` only after the `cursor-auto-review` workflow is stable. If required bots never post before the safety cap, exit **1** — **DO NOT MERGE**.
 
 ### 5b. Feedback synthesis
 
@@ -66,25 +66,9 @@ npm run pr:bot-feedback-check -- --pr <n>
 
 ### 7. Merge
 
-**Default:** `npm run pr:merge -- --pr <n>` (`gh pr merge --auto --squash --delete-branch`) only after steps 5–6 **and** GitHub checks **`bot-presence-gate`** + **`pr-bot-feedback-check`** are green (when branch protection is enabled). See **`templates/MERGE_POLICY.md`**.
-
-**Enable auto-merge on PR open:** `npm run pr:merge -- --pr <n> --enable-only` (skip branch sync).
+`gh pr merge --squash` only after steps 5–6 **and** GitHub checks **`bot-presence-gate`** + **`pr-bot-feedback-check`** are green (when branch protection is enabled).
 
 **Close without merge:** GitHub cannot block "Close pull request". Agents must not close without merge unless waived; `npm run agent:auditor` flags closed-unmerged PRs with open bot threads.
-
-### 7.1 PR queue efficiency (agents)
-
-One pr-fix worker per open PR owns the full loop to squash merge.
-
-| Step | Command |
-|------|---------|
-| PR opens | `npm run pr:merge -- --pr <n> --enable-only` |
-| Queue scan | `npm run pr:queue:drive` or `npm run pr:watch-once` |
-| Bot wait | `npm run wait-for-bots -- --pr <n>` (parallel per PR via `pr:queue:drive --parallel-wait`) |
-| Branch sync | `npm run pr:update-branch -- --pr <n> --progress` |
-| Gates | `npm run pr:gates:check -- --pr <n>` |
-
-Gate-exempt chore PRs (generated artifacts only under `reports/` or `AR_PR_GATE_EXEMPT_PREFIXES`): bot wait and thread gates skip automatically.
 
 ### 8. Deploy / restart
 
