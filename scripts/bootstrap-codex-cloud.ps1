@@ -9,6 +9,7 @@ param(
 )
 
 begin {
+    $ErrorActionPreference = 'Stop'
     $sourceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\codex-cloud')).Path
     $cloudFiles = @('lib.sh', 'setup.sh', 'maintenance.sh')
 }
@@ -45,9 +46,15 @@ process {
                 }
             }
 
-            & git -C $gitRoot check-ignore --quiet -- '.codex/cloud/setup.sh'
-            if ($LASTEXITCODE -eq 0) {
-                Write-Warning "$gitRoot ignores .codex/cloud; add explicit negation rules before committing the baseline."
+            $ignoredFiles = foreach ($file in $cloudFiles) {
+                $relativePath = ".codex/cloud/$file"
+                & git -C $gitRoot check-ignore --quiet -- $relativePath
+                if ($LASTEXITCODE -eq 0) {
+                    $relativePath
+                }
+            }
+            if ($ignoredFiles) {
+                Write-Warning "$gitRoot ignores baseline files: $($ignoredFiles -join ', '). Add explicit negation rules before committing them."
             }
 
             Write-Host "Cloud baseline ready in $gitRoot"

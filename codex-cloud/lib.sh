@@ -17,10 +17,23 @@ codex_cloud_lockfiles() {
     -not -path '*/vendor/*' -not -path '*/.venv/*' -print0
 }
 
+codex_cloud_setup_files() {
+  local script_dir
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  find "$script_dir" -maxdepth 1 -type f -name '*.sh' -print0
+}
+
+codex_cloud_cache_inputs() {
+  local repo_root="$1"
+  {
+    codex_cloud_lockfiles "$repo_root"
+    codex_cloud_setup_files
+  } | sort -zu
+}
+
 codex_cloud_lock_hash() {
   local repo_root="$1"
-  codex_cloud_lockfiles "$repo_root" \
-    | sort -z \
+  codex_cloud_cache_inputs "$repo_root" \
     | xargs -0 -r sha256sum \
     | sha256sum \
     | awk '{print $1}'
@@ -36,4 +49,13 @@ codex_cloud_dependency_dirs() {
 
 codex_cloud_marker() {
   printf '%s/codex-cloud/lockset.sha256\n' "${XDG_CACHE_HOME:-$HOME/.cache}"
+}
+
+codex_cloud_require_command() {
+  local command_name="$1"
+  local context="$2"
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "codex-cloud: $command_name is required for $context" >&2
+    return 1
+  fi
 }
