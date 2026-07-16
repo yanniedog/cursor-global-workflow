@@ -2,6 +2,8 @@
 
 Installed to `~/.cursor/skills/` by `install.ps1` / `install.sh`. Per-repo copies are optional.
 
+The global sync contract also applies to `codex-cloud/` and `scripts/bootstrap-codex-cloud.ps1`. Keep these files portable, secret-free, and usable from Linux Cloud containers.
+
 ## Global sync contract (no drift)
 
 **Public repo:** [github.com/yanniedog/cursor-global-workflow](https://github.com/yanniedog/cursor-global-workflow)
