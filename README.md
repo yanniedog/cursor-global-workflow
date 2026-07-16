@@ -1,5 +1,17 @@
 # cursor-global-workflow
 
+## Codex Cloud baseline
+
+The portable Cloud baseline lives in [`codex-cloud/`](codex-cloud/README.md). It provides lockfile-driven Linux setup and cache maintenance scripts plus a repository template and a safe onboarding checklist.
+
+Bootstrap a repository without overwriting existing instructions:
+
+```powershell
+.\scripts\bootstrap-codex-cloud.ps1 -RepoPath C:\code\my-project
+```
+
+Add `-CreateAgentsTemplate` only when the repository has no root `AGENTS.md`; replace the marked project-specific verification placeholder before committing it. Codex Cloud environments and GitHub access remain per-repository account settings and must pass the canary checks documented in `codex-cloud/README.md`.
+
 Reusable Cursor agents, rules, and scripts for **all** projects — chief coordination, ship bar, bot wait, PR thread closure, and browser QA.
 
 Install once per machine. After install, **every git repo** under your code folder is bootstrapped automatically when you open it in **Cursor** (zero manual steps per repo).
