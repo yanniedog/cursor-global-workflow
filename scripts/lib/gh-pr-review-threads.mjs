@@ -6,6 +6,8 @@ import { spawnSync } from 'node:child_process';
 const BOT_LOGIN_RE =
   /(?:gemini|codex|sourcery|coderabbit|copilot|greptile|chatgpt|github-actions\[bot\])/i;
 const QWEN_CODE_REVIEW_RE = /<!--\s*(qwen-code-review|cursor-auto-review)\s*-->/i;
+const GEMINI_CODE_REVIEW_RE =
+  /<!--\s*gemini-code-review\s*-->|#\s*Code Review by Gemini|\bCode Review by Gemini\b/i;
 
 const CLOSURE_BODY_RE =
   /\b(implemented|deferred|declined|won't fix|wontfix|post-merge|not applicable|n\/a)\b/i;
@@ -140,7 +142,11 @@ export function classifyThreads(threads, opts = {}) {
 
     const first = comments[0];
     const starterLogin = first.author.login;
-    if (starterLogin.toLowerCase() === 'github-actions[bot]' && !QWEN_CODE_REVIEW_RE.test(first.body || '')) {
+    if (
+      starterLogin.toLowerCase() === 'github-actions[bot]' &&
+      !QWEN_CODE_REVIEW_RE.test(first.body || '') &&
+      !GEMINI_CODE_REVIEW_RE.test(first.body || '')
+    ) {
       continue;
     }
     const starterIsBot = isBotLogin(starterLogin) || first.author.__typename === 'Bot';

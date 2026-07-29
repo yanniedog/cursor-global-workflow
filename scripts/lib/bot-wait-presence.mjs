@@ -2,8 +2,9 @@ import { spawnSync } from 'node:child_process';
 import {
   allKnownBotLogins,
   formatRequiredKeys,
+  isGeminiCodeReviewBody,
   isQwenCodeReviewBody,
-  missingRequiredKeys,
+  missingRequiredKeysFromEvents,
   resolveRequiredKeys,
 } from './bot-wait-config.mjs';
 
@@ -38,8 +39,14 @@ export function collectBotEvents(prPayload, knownBots, anchorIso) {
   const events = [];
   const pushEvent = (login, at, body) => {
     if (!login || !at) return;
-    if (login.toLowerCase() === 'github-actions[bot]' && !isQwenCodeReviewBody(body)) return;
-    events.push({ login, at });
+    if (
+      login.toLowerCase() === 'github-actions[bot]' &&
+      !isQwenCodeReviewBody(body) &&
+      !isGeminiCodeReviewBody(body)
+    ) {
+      return;
+    }
+    events.push({ login, at, body: body || '' });
   };
   for (const c of prPayload.comments?.nodes || []) {
     pushEvent(c.author?.login, c.createdAt, c.body);
@@ -66,7 +73,7 @@ export function checkRequiredBotsOnPr(owner, name, prNumber, { requiredKeys, anc
   const anchor = anchorIso || pr.createdAt;
   const events = collectBotEvents(pr, knownBots, anchor);
   const seenLogins = [...new Set(events.map((e) => e.login))];
-  const missing = missingRequiredKeys(keys, seenLogins);
+  const missing = missingRequiredKeysFromEvents(keys, events);
   return {
     requiredKeys: keys,
     anchor,

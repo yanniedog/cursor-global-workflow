@@ -8,6 +8,9 @@ export const BOT_ALIASES = {
     'gemini-code-assist[bot]',
     'google-github-actions-bot[bot]',
     'google-github-actions[bot]',
+    // sshnaidm/gemini-code-review-action posts as github-actions[bot]
+    // (matched via isGeminiCodeReviewBody, not bare login).
+    'github-actions[bot]',
   ],
   codex: ['chatgpt-codex-connector', 'chatgpt-codex-connector[bot]'],
   sourcery: ['sourcery-ai', 'sourcery-ai[bot]'],
@@ -28,9 +31,42 @@ export function isQwenCodeReviewBody(bodyRaw) {
   return /<!--\s*(qwen-code-review|cursor-auto-review)\s*-->/i.test(String(bodyRaw || ''));
 }
 
+export function isGeminiCodeReviewBody(bodyRaw) {
+  const body = String(bodyRaw || '');
+  return (
+    /<!--\s*gemini-code-review\s*-->/i.test(body) ||
+    /#\s*Code Review by Gemini/i.test(body) ||
+    /\bCode Review by Gemini\b/i.test(body)
+  );
+}
+
 /** @deprecated Use isQwenCodeReviewBody — accepts legacy cursor-auto-review marker too. */
 export function isCursorAutoReviewBody(bodyRaw) {
   return isQwenCodeReviewBody(bodyRaw);
+}
+
+/**
+ * Body-aware match so github-actions[bot] Qwen vs Gemini reviews do not
+ * satisfy each other's required keys.
+ */
+export function eventSatisfiesRequiredKey(login, body, key) {
+  const lower = String(login || '').toLowerCase();
+  const k = String(key || '').toLowerCase();
+  if (!lower) return false;
+  if (k === 'qwen' || k === 'cursor') {
+    return lower === 'github-actions[bot]' && isQwenCodeReviewBody(body);
+  }
+  if (k === 'gemini') {
+    if (lower === 'github-actions[bot]') return isGeminiCodeReviewBody(body);
+    return loginMatchesRequiredKey(login, 'gemini');
+  }
+  return loginMatchesRequiredKey(login, key);
+}
+
+export function missingRequiredKeysFromEvents(requiredKeys, events) {
+  return (requiredKeys || []).filter(
+    (key) => !(events || []).some((e) => eventSatisfiesRequiredKey(e.login, e.body, key)),
+  );
 }
 
 export function parseRequiredKeys(raw) {

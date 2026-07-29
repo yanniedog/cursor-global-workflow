@@ -12,8 +12,9 @@ import { setTimeout as sleepMs } from 'node:timers/promises';
 import {
   allKnownBotLogins,
   formatRequiredKeys,
+  isGeminiCodeReviewBody,
   isQwenCodeReviewBody,
-  missingRequiredKeys,
+  missingRequiredKeysFromEvents,
   parseRequiredKeys,
   resolveRequiredKeys,
 } from './lib/bot-wait-config.mjs';
@@ -154,8 +155,14 @@ function fetchBotActivity(owner, name, prNumber) {
   const events = [];
   const pushEvent = (login, at, body) => {
     if (!login || !at) return;
-    if (login.toLowerCase() === 'github-actions[bot]' && !isQwenCodeReviewBody(body)) return;
-    events.push({ login, at });
+    if (
+      login.toLowerCase() === 'github-actions[bot]' &&
+      !isQwenCodeReviewBody(body) &&
+      !isGeminiCodeReviewBody(body)
+    ) {
+      return;
+    }
+    events.push({ login, at, body: body || '' });
   };
   for (const c of pr.comments?.nodes || []) {
     pushEvent(c.author?.login, c.createdAt, c.body);
@@ -245,7 +252,7 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
     (e) => isKnownBotLogin(e.login, knownBots) && new Date(e.at).getTime() >= anchorMs,
   );
   const seenLogins = [...new Set(botEventsSinceAnchor.map((e) => e.login))];
-  const missing = missingRequiredKeys(requiredKeys, seenLogins);
+  const missing = missingRequiredKeysFromEvents(requiredKeys, botEventsSinceAnchor);
   const allRequiredPosted =
     requiredKeys.length > 0 && botEventsSinceAnchor.length > 0 && missing.length === 0;
   const lastBotAt =

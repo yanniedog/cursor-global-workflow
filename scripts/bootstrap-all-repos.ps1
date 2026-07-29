@@ -52,6 +52,7 @@ foreach ($r in $results) {
             '.cursor/PR_REVIEW_PROMPT.md',
             '.cursor/cli.json',
             '.github/workflows/cursor-auto-pr-review.yml',
+            '.github/workflows/gemini-review.yml',
             'scripts/qwen-pr-review.mjs'
         )
         foreach ($rel in $cursorPaths) {

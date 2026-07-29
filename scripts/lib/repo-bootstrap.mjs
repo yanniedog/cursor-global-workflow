@@ -184,6 +184,12 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
     'workflows',
     'cursor-auto-pr-review.yml',
   );
+  const geminiReviewWorkflowTemplate = join(
+    templatesDir,
+    '.github',
+    'workflows',
+    'gemini-review.yml',
+  );
   const cursorReviewPromptTemplate = join(templatesDir, '.cursor', 'PR_REVIEW_PROMPT.md');
   const cursorCliConfigTemplate = join(templatesDir, '.cursor', 'cli.json');
   const qwenReviewScriptTemplate = join(templatesDir, 'scripts', 'qwen-pr-review.mjs');
@@ -195,6 +201,12 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
     '.github',
     'workflows',
     'cursor-auto-pr-review.yml',
+  );
+  const geminiReviewWorkflowDest = join(
+    workspaceRoot,
+    '.github',
+    'workflows',
+    'gemini-review.yml',
   );
   const cursorReviewPromptDest = join(cursorDir, 'PR_REVIEW_PROMPT.md');
   const cursorCliConfigDest = join(cursorDir, 'cli.json');
@@ -228,11 +240,23 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
     '.github/workflows/cursor-auto-pr-review.yml',
     result,
   );
+  copyTemplateIfMissing(
+    geminiReviewWorkflowTemplate,
+    geminiReviewWorkflowDest,
+    '.github/workflows/gemini-review.yml',
+    result,
+  );
   if (markerVersion !== null) {
     copyTemplateAlways(
       cursorReviewWorkflowTemplate,
       cursorReviewWorkflowDest,
       '.github/workflows/cursor-auto-pr-review.yml',
+      result,
+    );
+    copyTemplateAlways(
+      geminiReviewWorkflowTemplate,
+      geminiReviewWorkflowDest,
+      '.github/workflows/gemini-review.yml',
       result,
     );
     copyTemplateAlways(
