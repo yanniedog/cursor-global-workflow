@@ -15,6 +15,7 @@ import { platform } from 'node:os';
 
 const NPM_STUBS = {
   'wait-for-bots': 'wait_for_bots.mjs',
+  'pr:request-codex-review': 'request-codex-review.mjs',
   'chief:scan': 'chief-scan.mjs',
   'pr:bot-feedback-check': 'pr-bot-feedback-check.mjs',
   'pr:bot-feedback-audit': 'pr-bot-feedback-check.mjs --audit-merged --limit 20',
@@ -184,6 +185,12 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
     'workflows',
     'cursor-auto-pr-review.yml',
   );
+  const codexRequestWorkflowTemplate = join(
+    templatesDir,
+    '.github',
+    'workflows',
+    'pr-request-bot-reviews.yml',
+  );
   const cursorReviewPromptTemplate = join(templatesDir, '.cursor', 'PR_REVIEW_PROMPT.md');
   const cursorCliConfigTemplate = join(templatesDir, '.cursor', 'cli.json');
   const ruleDest = join(rulesDir, '00-use-global-workflow.mdc');
@@ -193,6 +200,12 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
     '.github',
     'workflows',
     'cursor-auto-pr-review.yml',
+  );
+  const codexRequestWorkflowDest = join(
+    workspaceRoot,
+    '.github',
+    'workflows',
+    'pr-request-bot-reviews.yml',
   );
   const cursorReviewPromptDest = join(cursorDir, 'PR_REVIEW_PROMPT.md');
   const cursorCliConfigDest = join(cursorDir, 'cli.json');
@@ -223,6 +236,12 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
     cursorReviewWorkflowTemplate,
     cursorReviewWorkflowDest,
     '.github/workflows/cursor-auto-pr-review.yml',
+    result,
+  );
+  copyTemplateIfMissing(
+    codexRequestWorkflowTemplate,
+    codexRequestWorkflowDest,
+    '.github/workflows/pr-request-bot-reviews.yml',
     result,
   );
   if (markerVersion !== null) {

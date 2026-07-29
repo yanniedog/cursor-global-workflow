@@ -158,6 +158,8 @@ Copy CI workflow:
 
 ```sh
 cp workflows/pr-bot-feedback-check.yml YOUR_REPO/.github/workflows/
+cp workflows/pr-request-bot-reviews.yml YOUR_REPO/.github/workflows/
+cp workflows/pr-bot-presence-gate.yml YOUR_REPO/.github/workflows/  # if using presence gate
 ```
 
 Copy hook stub:

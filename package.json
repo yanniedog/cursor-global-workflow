@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "wait-for-bots": "node scripts/wait_for_bots.mjs",
+    "pr:request-codex-review": "node scripts/request-codex-review.mjs",
     "chief:scan": "node scripts/chief-scan.mjs",
     "agent:auditor": "node scripts/agent-auditor-scan.mjs",
     "pr:bot-feedback-check": "node scripts/pr-bot-feedback-check.mjs",

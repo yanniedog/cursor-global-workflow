@@ -52,6 +52,8 @@ Run after creating a new PR (or after tagging bots). Exit **2** = still waiting,
 
 Override: `AR_BOT_WAIT_REQUIRED=gemini,codex,sourcery` or `--require-bots`. Add `cursor` only after the `cursor-auto-review` workflow is stable. If required bots never post before the safety cap, exit **1** — **DO NOT MERGE**.
 
+Codex does not auto-review like Gemini/Sourcery. Copy workflows/pr-request-bot-reviews.yml (or bootstrap) so PRs get @codex review automatically. Install **ChatGPT Codex Connector** on the repo (Settings ? Integrations ? GitHub Apps), or grant it **All repositories** at https://github.com/apps/chatgpt-codex-connector/installations/new.
+
 ### 5b. Feedback synthesis
 
 Before thread replies: read all bot/human threads → post `## Feedback plan` on the PR → one implementation push → then in-thread replies.
