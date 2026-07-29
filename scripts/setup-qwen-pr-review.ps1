@@ -1,6 +1,6 @@
 # Set Qwen PR review secrets on GitHub repos for cursor-auto-pr-review workflow.
 param(
-    [string]$BaseUrl = $env:QWEN_API_BASE_URL,
+    [string]$BaseUrl = $(if ($env:QWEN_API_BASE_URL) { $env:QWEN_API_BASE_URL } else { 'http://127.0.0.1:11434/v1' }),
     [string]$ApiKey = $env:QWEN_API_KEY,
     [string]$Model = $(if ($env:QWEN_MODEL) { $env:QWEN_MODEL } else { 'qwen3-coder:30b' }),
     [string]$CodeRoot = (Join-Path $env:USERPROFILE 'code'),
@@ -9,10 +9,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-
-if (-not $BaseUrl) {
-    $BaseUrl = Read-Host 'Paste QWEN_API_BASE_URL (OpenAI-compatible, e.g. https://host/v1)'
-}
 
 if (-not $BaseUrl) {
     throw 'QWEN_API_BASE_URL is required.'
