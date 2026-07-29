@@ -32,9 +32,32 @@ jobs:
           && github.event.issue.pull_request
           && github.event.comment.user.type != 'Bot'
           && contains(github.event.comment.body, '@qwen-review'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Local Ollama on this machine (same pattern as simjury pr-local-llm-review).
+    runs-on: [self-hosted, Windows, X64, qwen-local-llm]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
     steps:
+      - name: Reject untrusted fork execution
+        if: github.event_name == 'pull_request' || github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:EVENT_NAME -eq 'issue_comment') {
+            $head = gh api "repos/$env:BASE_REPO/pulls/$env:ISSUE_NUMBER" --jq .head.repo.full_name
+          } else {
+            $head = $env:HEAD_REPO
+          }
+          if ($head -ne $env:BASE_REPO) {
+            throw "Fork PRs cannot run on the private laptop reviewer. head=$head base=$($env:BASE_REPO)"
+          }
+
       - name: Resolve pull request metadata
         id: pr
         env:
@@ -46,29 +69,29 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           INPUT_PR: ${{ inputs.pr_number }}
         run: |
-          set -euo pipefail
-          FORCE_RERUN=false
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            PR_NUMBER="$INPUT_PR"
-            PR_JSON="$(gh pr view "$PR_NUMBER" --json headRefOid,baseRefName)"
-            HEAD_SHA="$(printf '%s' "$PR_JSON" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).headRefOid));")"
-            BASE_REF="$(printf '%s' "$PR_JSON" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).baseRefName));")"
-            FORCE_RERUN=true
-          elif [ "$EVENT_NAME" = "issue_comment" ]; then
-            PR_NUMBER="$ISSUE_NUMBER"
-            PR_JSON="$(gh pr view "$PR_NUMBER" --json headRefOid,baseRefName)"
-            HEAD_SHA="$(printf '%s' "$PR_JSON" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).headRefOid));")"
-            BASE_REF="$(printf '%s' "$PR_JSON" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).baseRefName));")"
-            FORCE_RERUN=true
-          else
-            PR_NUMBER="$EVENT_PR"
-            HEAD_SHA="$EVENT_HEAD_SHA"
-            BASE_REF="$EVENT_BASE_REF"
-          fi
-          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
-          echo "force_rerun=$FORCE_RERUN" >> "$GITHUB_OUTPUT"
+          $ErrorActionPreference = 'Stop'
+          $force = 'false'
+          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+            $pr = $env:INPUT_PR
+            $json = gh pr view $pr --json headRefOid,baseRefName | ConvertFrom-Json
+            $head = $json.headRefOid
+            $base = $json.baseRefName
+            $force = 'true'
+          } elseif ($env:EVENT_NAME -eq 'issue_comment') {
+            $pr = $env:ISSUE_NUMBER
+            $json = gh pr view $pr --json headRefOid,baseRefName | ConvertFrom-Json
+            $head = $json.headRefOid
+            $base = $json.baseRefName
+            $force = 'true'
+          } else {
+            $pr = $env:EVENT_PR
+            $head = $env:EVENT_HEAD_SHA
+            $base = $env:EVENT_BASE_REF
+          }
+          "number=$pr" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "head_sha=$head" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "base_ref=$base" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "force_rerun=$force" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Gate exempt check
         id: gate_exempt
@@ -78,18 +101,18 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
         run: |
-          set -euo pipefail
-          if [ "$PR_AUTHOR_TYPE" = "Bot" ] || [[ "$PR_AUTHOR" == *"[bot]" ]]; then
-            echo "exempt=true" >> "$GITHUB_OUTPUT"
-            echo "reason=bot-authored" >> "$GITHUB_OUTPUT"
+          $ErrorActionPreference = 'Stop'
+          if ($env:PR_AUTHOR_TYPE -eq 'Bot' -or $env:PR_AUTHOR -like '*[bot]') {
+            "exempt=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            "reason=bot-authored" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
             exit 0
-          fi
-          if echo "$PR_TITLE" | grep -qiE '^chore(\((deps|deps-dev|ci|bot|release)\)|:\s*(deps|dependabot|renovate|bot\b))'; then
-            echo "exempt=true" >> "$GITHUB_OUTPUT"
-            echo "reason=chore" >> "$GITHUB_OUTPUT"
-          else
-            echo "exempt=false" >> "$GITHUB_OUTPUT"
-          fi
+          }
+          if ($env:PR_TITLE -match '^chore(\((deps|deps-dev|ci|bot|release)\)|:\s*(deps|dependabot|renovate|bot\b))') {
+            "exempt=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            "reason=chore" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          } else {
+            "exempt=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
 
       - name: Skip if already reviewed for this commit
         id: already
@@ -100,14 +123,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          set -euo pipefail
-          existing="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" --paginate \
-            --jq '.check_runs[] | select(.name=="qwen-code-review" and .conclusion=="success") | .id' | head -n 1 || true)"
-          if [ -n "$existing" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          $ErrorActionPreference = 'Stop'
+          $existing = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA/check-runs" --paginate `
+            --jq '.check_runs[] | select(.name=="qwen-code-review" and .conclusion=="success") | .id' |
+            Select-Object -First 1
+          if ($existing) {
+            "skip=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          } else {
+            "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
 
       - name: Gate exempt or already reviewed — pass
         if: steps.gate_exempt.outputs.exempt == 'true' || steps.already.outputs.skip == 'true'
@@ -116,26 +140,22 @@ jobs:
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           REASON: ${{ steps.gate_exempt.outputs.reason || 'already-reviewed' }}
         run: |
-          set -euo pipefail
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            --field name="qwen-code-review" \
-            --field head_sha="$HEAD_SHA" \
-            --field status="completed" \
-            --field conclusion="success" \
-            --field "output[title]=Qwen Code Review" \
-            --field "output[summary]=Skipped ($REASON)." > /dev/null
-          echo "qwen-code-review: skipped ($REASON)"
+          $ErrorActionPreference = 'Stop'
+          gh api --method POST "repos/$env:GITHUB_REPOSITORY/check-runs" `
+            --field name="qwen-code-review" `
+            --field head_sha="$env:HEAD_SHA" `
+            --field status="completed" `
+            --field conclusion="success" `
+            --field "output[title]=Qwen Code Review" `
+            --field "output[summary]=Skipped ($env:REASON)." | Out-Null
+          Write-Host "qwen-code-review: skipped ($env:REASON)"
 
       - uses: actions/checkout@v4
         if: steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
         with:
           ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        if: steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
-        with:
-          node-version: '20'
+          clean: true
 
       - name: Run Qwen Code review
         id: review
@@ -147,40 +167,38 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           BASE_REF: ${{ steps.pr.outputs.base_ref }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-          OUT_FILE: /tmp/qwen-review.txt
         run: |
-          set -euo pipefail
-          if [ -z "${QWEN_API_BASE_URL:-}" ]; then
-            echo "QWEN_API_BASE_URL secret is missing. Set it to your reachable OpenAI-compatible base URL." > /tmp/qwen-review-error.txt
-            echo "status=1" >> "$GITHUB_OUTPUT"
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:QWEN_API_BASE_URL) { $env:QWEN_API_BASE_URL = 'http://127.0.0.1:11434/v1' }
+          if (-not $env:QWEN_MODEL) { $env:QWEN_MODEL = 'qwen3-coder:30b' }
+          $outFile = Join-Path $env:RUNNER_TEMP 'qwen-review.txt'
+          $errFile = Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt'
+          $env:OUT_FILE = $outFile
+          $script = 'scripts/qwen-pr-review.mjs'
+          if (-not (Test-Path $script)) {
+            'Missing scripts/qwen-pr-review.mjs in the repository checkout.' | Set-Content -Path $errFile
+            "status=1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
             exit 0
-          fi
-          if [ -z "${QWEN_MODEL:-}" ]; then
-            export QWEN_MODEL="qwen3-coder:30b"
-          fi
-          REVIEW_SCRIPT="scripts/qwen-pr-review.mjs"
-          if [ ! -f "$REVIEW_SCRIPT" ]; then
-            echo "Missing $REVIEW_SCRIPT in the repository checkout." > /tmp/qwen-review-error.txt
-            echo "status=1" >> "$GITHUB_OUTPUT"
+          }
+          Get-Process ollama -ErrorAction SilentlyContinue | ForEach-Object { $_.PriorityClass = 'BelowNormal' }
+          $stdout = Join-Path $env:RUNNER_TEMP 'qwen-review-stdout.txt'
+          $p = Start-Process -FilePath node -ArgumentList $script -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $stdout -RedirectStandardError $errFile
+          if ($p.ExitCode -ne 0) {
+            "status=$($p.ExitCode)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
             exit 0
-          fi
-          set +e
-          node "$REVIEW_SCRIPT" > /tmp/qwen-review-stdout.txt 2> /tmp/qwen-review-error.txt
-          status=$?
-          set -e
-          if [ "$status" -ne 0 ]; then
-            echo "status=$status" >> "$GITHUB_OUTPUT"
+          }
+          if (-not (Test-Path $outFile) -or ((Get-Item $outFile).Length -eq 0)) {
+            if ((Test-Path $stdout) -and ((Get-Item $stdout).Length -gt 0)) {
+              Copy-Item $stdout $outFile -Force
+            }
+          }
+          if (-not (Test-Path $outFile) -or ((Get-Item $outFile).Length -eq 0)) {
+            'Qwen review completed without producing review output.' | Set-Content -Path $errFile
+            "status=1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
             exit 0
-          fi
-          if [ ! -s /tmp/qwen-review.txt ] && [ -s /tmp/qwen-review-stdout.txt ]; then
-            cp /tmp/qwen-review-stdout.txt /tmp/qwen-review.txt
-          fi
-          if [ ! -s /tmp/qwen-review.txt ]; then
-            echo "Qwen review completed without producing review output." > /tmp/qwen-review-error.txt
-            echo "status=1" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "status=0" >> "$GITHUB_OUTPUT"
+          }
+          "status=0" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Post or update PR review comment
         if: always() && steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
@@ -189,29 +207,29 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           REVIEW_STATUS: ${{ steps.review.outputs.status }}
         run: |
-          set -euo pipefail
-          {
-            echo "<!-- qwen-code-review -->"
-            echo "## Qwen Code Review"
-            echo
-            if [ "${REVIEW_STATUS:-1}" = "0" ]; then
-              cat /tmp/qwen-review.txt
-            else
-              echo "Qwen Code review did not complete successfully."
-              echo
-              echo '```text'
-              sed -e 's/\r$//' /tmp/qwen-review-error.txt
-              echo '```'
-            fi
-          } > /tmp/qwen-review-comment.md
-
-          comment_id="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq '.[] | select((.body | contains("<!-- qwen-code-review -->")) or (.body | contains("<!-- cursor-auto-review -->"))) | .id' | tail -n 1 || true)"
-          if [ -n "$comment_id" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" --field body=@/tmp/qwen-review-comment.md > /dev/null
-          else
-            gh pr comment "$PR_NUMBER" --body-file /tmp/qwen-review-comment.md
-          fi
+          $ErrorActionPreference = 'Stop'
+          $outFile = Join-Path $env:RUNNER_TEMP 'qwen-review.txt'
+          $errFile = Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt'
+          $comment = Join-Path $env:RUNNER_TEMP 'qwen-review-comment.md'
+          $lines = @('<!-- qwen-code-review -->', '## Qwen Code Review', '')
+          if ($env:REVIEW_STATUS -eq '0') {
+            $lines += Get-Content -Raw $outFile
+          } else {
+            $lines += 'Qwen Code review did not complete successfully.'
+            $lines += ''
+            $lines += '```text'
+            if (Test-Path $errFile) { $lines += (Get-Content -Raw $errFile).TrimEnd() }
+            $lines += '```'
+          }
+          Set-Content -Path $comment -Value ($lines -join "`n") -Encoding utf8
+          $commentId = gh api "repos/$env:GITHUB_REPOSITORY/issues/$env:PR_NUMBER/comments" --paginate `
+            --jq '.[] | select((.body | contains("<!-- qwen-code-review -->")) or (.body | contains("<!-- cursor-auto-review -->"))) | .id' |
+            Select-Object -Last 1
+          if ($commentId) {
+            gh api --method PATCH "repos/$env:GITHUB_REPOSITORY/issues/comments/$commentId" --field body="@$comment" | Out-Null
+          } else {
+            gh pr comment $env:PR_NUMBER --body-file $comment
+          }
 
       - name: Publish qwen-code-review check
         if: always() && steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
@@ -220,20 +238,18 @@ jobs:
           REVIEW_STATUS: ${{ steps.review.outputs.status }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          set -euo pipefail
-          conclusion="success"
-          summary="Qwen Code review completed and posted a PR comment."
-          if [ "${REVIEW_STATUS:-1}" != "0" ]; then
-            conclusion="failure"
-            summary="Qwen Code review failed. See the PR comment and workflow logs."
-          fi
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            --field name="qwen-code-review" \
-            --field head_sha="$HEAD_SHA" \
-            --field status="completed" \
-            --field conclusion="$conclusion" \
-            --field "output[title]=Qwen Code Review" \
-            --field "output[summary]=$summary" > /dev/null
-          if [ "$conclusion" != "success" ]; then
-            exit 1
-          fi
+          $ErrorActionPreference = 'Stop'
+          $conclusion = 'success'
+          $summary = 'Qwen Code review completed and posted a PR comment.'
+          if ($env:REVIEW_STATUS -ne '0') {
+            $conclusion = 'failure'
+            $summary = 'Qwen Code review failed. See the PR comment and workflow logs.'
+          }
+          gh api --method POST "repos/$env:GITHUB_REPOSITORY/check-runs" `
+            --field name="qwen-code-review" `
+            --field head_sha="$env:HEAD_SHA" `
+            --field status="completed" `
+            --field conclusion="$conclusion" `
+            --field "output[title]=Qwen Code Review" `
+            --field "output[summary]=$summary" | Out-Null
+          if ($conclusion -ne 'success') { exit 1 }

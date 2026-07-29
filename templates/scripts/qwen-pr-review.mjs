@@ -4,7 +4,7 @@
  * Exit non-zero on any missing config, API failure, empty response, or git error.
  *
  * Env:
- *   QWEN_API_BASE_URL  (required) e.g. https://host/v1
+ *   QWEN_API_BASE_URL  (optional) default http://127.0.0.1:11434/v1
  *   QWEN_API_KEY       (optional) Bearer token when set
  *   QWEN_MODEL         (optional) default qwen3-coder:30b
  *   PR_NUMBER          (optional) for prompt context
@@ -19,6 +19,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const DEFAULT_MODEL = 'qwen3-coder:30b';
+const DEFAULT_BASE_URL = 'http://127.0.0.1:11434/v1';
 const DEFAULT_DIFF_MAX = 350_000;
 
 function log(msg) {
@@ -73,7 +74,8 @@ function buildUserPrompt({ rubric, repo, prNumber, baseRef, headSha, diff }) {
 }
 
 async function main() {
-  const baseUrl = normalizeBaseUrl(requireEnv('QWEN_API_BASE_URL'));
+  const configuredBase = (process.env.QWEN_API_BASE_URL || '').trim() || DEFAULT_BASE_URL;
+  const baseUrl = normalizeBaseUrl(configuredBase);
   const apiKey = (process.env.QWEN_API_KEY || '').trim();
   const model = (process.env.QWEN_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
   const baseRef = requireEnv('BASE_REF');
