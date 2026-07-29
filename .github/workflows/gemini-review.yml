@@ -1,4 +1,4 @@
-name: "Automated Gemini Code Review"
+﻿name: "Automated Gemini Code Review"
 on:
   pull_request:
     types: [opened, synchronize]
