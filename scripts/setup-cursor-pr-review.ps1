@@ -1,4 +1,5 @@
-# Set CURSOR_API_KEY on GitHub repos for cursor-auto-pr-review workflow.
+# Set CURSOR_API_KEY — superseded by Qwen self-hosted review secrets.
+# Prefer: .\setup-qwen-pr-review.ps1
 param(
     [string]$ApiKey = $env:CURSOR_API_KEY,
     [string]$CodeRoot = (Join-Path $env:USERPROFILE 'code'),
@@ -7,6 +8,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+Write-Host 'NOTE: PR review now uses Qwen (setup-qwen-pr-review.ps1), not Cursor Auto.'
+Write-Host 'This script only sets CURSOR_API_KEY if you still need it for other tooling.'
+Write-Host ''
 
 if (-not $ApiKey) {
     Write-Host 'Create an API key at https://cursor.com/dashboard (API Keys).'
@@ -57,8 +62,7 @@ foreach ($slug in $repos) {
 
 Write-Host ''
 Write-Host "Secrets set on $set repos."
-Write-Host 'Also disable on-demand overage in Cursor dashboard: Settings -> Usage.'
-Write-Host 'Open a PR with code changes (not markdown-only) to trigger cursor-auto-pr-review.'
+Write-Host 'For Qwen PR reviews, run: .\setup-qwen-pr-review.ps1'
 
 if ($PushRepos) {
     & (Join-Path $PSScriptRoot 'bootstrap-all-repos.ps1') -CodeRoot $CodeRoot -Commit -Push

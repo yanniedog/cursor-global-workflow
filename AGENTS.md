@@ -58,6 +58,8 @@ Installed to `~/.cursor/workflow-scripts/`; env `CURSOR_WORKFLOW_SCRIPTS` points
 | `ship:closeout:strict` | `ship-closeout-strict.mjs` |
 | `agent:auditor` | `agent-auditor-scan.mjs` |
 
+PR review (Qwen): `scripts/qwen-pr-review.mjs` + `.github/workflows/cursor-auto-pr-review.yml`. Setup: [`docs/QWEN_PR_REVIEW_SETUP.md`](docs/QWEN_PR_REVIEW_SETUP.md). Tag re-review with `@qwen-review` then `npm run wait-for-bots -- --bot-tag`.
+
 Wire these in each repo's `package.json` (see README tier 2).
 
 ## Per-project config

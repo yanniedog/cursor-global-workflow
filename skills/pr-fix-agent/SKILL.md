@@ -109,8 +109,9 @@ After merge: run project `{DEPLOY_COMMAND}` and `{VERIFY_COMMAND}` from `WORKFLO
 | gemini | gemini-code-assist[bot] |
 | codex | chatgpt-codex-connector[bot] |
 | sourcery | sourcery-ai[bot] |
+| qwen | github-actions[bot] (`<!-- qwen-code-review -->`) — wake with `@qwen-review` |
 
-After @mentioning bots: `npm run wait-for-bots -- --bot-tag` then loop until exit 0.
+After @mentioning bots (include `@qwen-review`): `npm run wait-for-bots -- --bot-tag` then loop until exit 0.
 
 ## Return format
 

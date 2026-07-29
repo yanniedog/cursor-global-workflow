@@ -29,9 +29,9 @@ Commit only on the topic branch. `git push -u origin HEAD`.
 
 ### 4. CI green
 
-`gh pr checks <n> --watch` until required checks pass. Fix forward on this PR. After fix pushes, `@mention` reviewers using handles from `gh pr view -c`.
+`gh pr checks <n> --watch` until required checks pass. Fix forward on this PR. After fix pushes, `@mention` reviewers using handles from `gh pr view -c`, and include `@qwen-review` so Qwen Code re-reviews.
 
-**Required GitHub status checks (when branch protection is enabled):** `bot-presence-gate`, `pr-bot-feedback-check`. Cursor Auto Review may also appear as advisory check `cursor-auto-review`. Apply: `npm run branch-protection:apply`.
+**Required GitHub status checks (when branch protection is enabled):** `bot-presence-gate`, `pr-bot-feedback-check`. Qwen Code Review appears as check `qwen-code-review`. Apply: `npm run branch-protection:apply`.
 
 ### 5. Bot wait trigger (dynamic)
 
@@ -46,11 +46,11 @@ Run after creating a new PR (or after tagging bots). Exit **2** = still waiting,
 **Ready when** (since wait anchor — PR creation or `--bot-tag`):
 
 - Required CI checks are not pending, **and**
-- **Every required bot** has posted since the anchor (default: **gemini**, **codex**, **sourcery**; optional: **cursor** via Cursor Auto Review), **and**
+- **Every required bot** has posted since the anchor (default: **gemini**, **codex**, **sourcery**, **qwen**), **and**
 - **90s** quiet window after last bot activity, **and**
 - At least **60s** since anchor
 
-Override: `AR_BOT_WAIT_REQUIRED=gemini,codex,sourcery` or `--require-bots`. Add `cursor` only after the `cursor-auto-review` workflow is stable. If required bots never post before the safety cap, exit **1** — **DO NOT MERGE**.
+Override: `AR_BOT_WAIT_REQUIRED=gemini,codex,sourcery,qwen` or `--require-bots`. Tag Qwen with `@qwen-review` before `--bot-tag`. If required bots never post before the safety cap, exit **1** — **DO NOT MERGE**.
 
 ### 5b. Feedback synthesis
 

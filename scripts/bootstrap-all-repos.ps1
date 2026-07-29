@@ -51,7 +51,8 @@ foreach ($r in $results) {
             '.cursor/workflow-bootstrapped',
             '.cursor/PR_REVIEW_PROMPT.md',
             '.cursor/cli.json',
-            '.github/workflows/cursor-auto-pr-review.yml'
+            '.github/workflows/cursor-auto-pr-review.yml',
+            'scripts/qwen-pr-review.mjs'
         )
         foreach ($rel in $cursorPaths) {
             if (Test-Path ($rel -replace '/', '\')) { $toAdd += $rel }
@@ -79,7 +80,7 @@ foreach ($r in $results) {
         }
 
         git add @toAdd
-        git commit -m "chore: add Cursor Auto PR review workflow (Pro+ Auto quota)"
+        git commit -m "chore: add Qwen Code PR review workflow (self-hosted)"
         $committed++
         Write-Host "     commit: done"
 

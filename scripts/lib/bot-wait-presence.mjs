@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import {
   allKnownBotLogins,
   formatRequiredKeys,
-  isCursorAutoReviewBody,
+  isQwenCodeReviewBody,
   missingRequiredKeys,
   resolveRequiredKeys,
 } from './bot-wait-config.mjs';
@@ -38,7 +38,7 @@ export function collectBotEvents(prPayload, knownBots, anchorIso) {
   const events = [];
   const pushEvent = (login, at, body) => {
     if (!login || !at) return;
-    if (login.toLowerCase() === 'github-actions[bot]' && !isCursorAutoReviewBody(body)) return;
+    if (login.toLowerCase() === 'github-actions[bot]' && !isQwenCodeReviewBody(body)) return;
     events.push({ login, at });
   };
   for (const c of prPayload.comments?.nodes || []) {

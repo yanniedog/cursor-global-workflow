@@ -29,7 +29,7 @@ Commit only on the topic branch. `git push -u origin HEAD`.
 
 ### 4. CI green
 
-`gh pr checks <n> --watch` until required checks pass. Fix forward on this PR. After fix pushes, `@mention` reviewers using handles from `gh pr view -c`.
+`gh pr checks <n> --watch` until required checks pass. Fix forward on this PR. After fix pushes, `@mention` reviewers using handles from `gh pr view -c`, and include `@qwen-review` so Qwen Code re-reviews.
 
 ### 5. Bot wait trigger (dynamic)
 
@@ -44,7 +44,7 @@ Run after creating a new PR (or after tagging bots). Exit **2** = still waiting,
 **Ready when** (since wait anchor — PR creation or `--bot-tag`):
 
 - Required CI checks are not pending, **and**
-- At least one configured bot has commented since the anchor, **and**
+- **Every required bot** has posted since the anchor (default: **gemini**, **codex**, **sourcery**, **qwen**), **and**
 - Either no bot activity for **90s** (quiet window) **or** every configured bot has posted, **and**
 - At least **60s** since anchor (unless cached ready state)
 
@@ -52,7 +52,7 @@ Run after creating a new PR (or after tagging bots). Exit **2** = still waiting,
 
 **Orchestrator loop:** re-run until exit **0**. Do **not** proceed to synthesis while exit **2**.
 
-Code fix pushes do **not** restart the wait anchor unless you tagged bots (`--bot-tag`).
+After fix pushes: `@mention` bots and include `@qwen-review`, then `npm run wait-for-bots -- --bot-tag`. Code fix pushes do **not** restart the wait anchor unless you tagged bots (`--bot-tag`).
 
 ### 5b. Synthesize all feedback before responding
 

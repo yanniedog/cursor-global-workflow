@@ -1,6 +1,6 @@
-# Cursor Auto PR Review
+# Qwen Code PR Review
 
-You are reviewing a pull request in CI using Cursor Auto. This is a review-only task.
+You are reviewing a pull request in CI using Qwen 3 Coder. This is a review-only task.
 
 ## Ground Rules
 
@@ -20,7 +20,7 @@ Before reviewing, read the repo guidance when present:
 - `.cursor/rules/**/*.mdc`
 - `.cursor/PR_REVIEW_PROMPT.md`
 
-Review the pull request diff from the base branch to `HEAD`. Use `git diff` and inspect the surrounding code for any changed lines that look risky.
+Review the pull request diff from the base branch to `HEAD`. Use the provided diff and reason about surrounding risk for any changed lines that look risky.
 
 ## Review Focus
 

@@ -45,7 +45,7 @@ See `~/.cursor/rules/close-loop-never-defer.mdc`.
 4. **Perfection bar** — deliverables = merged PRs with thread closure and project verify when code shipped.
 5. **Escalation to human** — only after a remediation subagent reports a **hard blocker** (auth failure, GitHub outage) **with evidence**. Until then, chief keeps delegating.
 
-See `workflow-orchestrator` skill — orchestrator **must not merge** until `wait-for-bots` exit **0** (gemini + codex + sourcery posted since anchor), `pr:bot-feedback-check` exit **0**, and substantive bot/human inline threads are closed. **Never** merge on CI green alone.
+See `workflow-orchestrator` skill — orchestrator **must not merge** until `wait-for-bots` exit **0** (gemini + codex + sourcery + qwen posted since anchor), `pr:bot-feedback-check` exit **0**, and substantive bot/human inline threads are closed. **Never** merge on CI green alone.
 
 ## Global feature sync (chief enforces)
 

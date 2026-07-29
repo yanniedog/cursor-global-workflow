@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 const BOT_LOGIN_RE =
   /(?:gemini|codex|sourcery|coderabbit|copilot|greptile|chatgpt|github-actions\[bot\])/i;
-const CURSOR_AUTO_REVIEW_RE = /<!--\s*cursor-auto-review\s*-->/i;
+const QWEN_CODE_REVIEW_RE = /<!--\s*(qwen-code-review|cursor-auto-review)\s*-->/i;
 
 const CLOSURE_BODY_RE =
   /\b(implemented|deferred|declined|won't fix|wontfix|post-merge|not applicable|n\/a)\b/i;
@@ -140,7 +140,7 @@ export function classifyThreads(threads, opts = {}) {
 
     const first = comments[0];
     const starterLogin = first.author.login;
-    if (starterLogin.toLowerCase() === 'github-actions[bot]' && !CURSOR_AUTO_REVIEW_RE.test(first.body || '')) {
+    if (starterLogin.toLowerCase() === 'github-actions[bot]' && !QWEN_CODE_REVIEW_RE.test(first.body || '')) {
       continue;
     }
     const starterIsBot = isBotLogin(starterLogin) || first.author.__typename === 'Bot';

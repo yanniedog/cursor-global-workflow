@@ -11,7 +11,7 @@ alwaysApply: true
 
 - CI failures (tests, lint).
 - Human inline comments and reviews.
-- Bots: Gemini, Codex, Cursor Auto Review, Copilot, CodeRabbit, Sourcery, Greptile, security scanners.
+- Bots: Gemini, Codex, Qwen Code Review, Copilot, CodeRabbit, Sourcery, Greptile, security scanners.
 
 ## Per finding
 

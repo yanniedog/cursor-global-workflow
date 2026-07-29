@@ -12,7 +12,7 @@ import { setTimeout as sleepMs } from 'node:timers/promises';
 import {
   allKnownBotLogins,
   formatRequiredKeys,
-  isCursorAutoReviewBody,
+  isQwenCodeReviewBody,
   missingRequiredKeys,
   parseRequiredKeys,
   resolveRequiredKeys,
@@ -154,7 +154,7 @@ function fetchBotActivity(owner, name, prNumber) {
   const events = [];
   const pushEvent = (login, at, body) => {
     if (!login || !at) return;
-    if (login.toLowerCase() === 'github-actions[bot]' && !isCursorAutoReviewBody(body)) return;
+    if (login.toLowerCase() === 'github-actions[bot]' && !isQwenCodeReviewBody(body)) return;
     events.push({ login, at });
   };
   for (const c of pr.comments?.nodes || []) {
@@ -345,7 +345,7 @@ Options:
   --watch, -w           Poll every ${POLL_INTERVAL_SEC}s until ready or cap
   --bot-tag             Reset wait anchor to now (after @mentioning bots)
   --since <iso>         Anchor wait window to timestamp (ISO 8601)
-  --require-bots <list> Comma-separated required keys (default: gemini,codex,sourcery)
+  --require-bots <list> Comma-separated required keys (default: gemini,codex,sourcery,qwen)
   --help, -h            Show this help
 
 Exit codes: 0 ready | 2 still waiting | 1 error or required bots missing at cap (DO NOT MERGE)

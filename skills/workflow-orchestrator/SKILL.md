@@ -71,7 +71,7 @@ Each PR gets the **full** ship bar (steps 1?9 in `WORKFLOW.md`).
 2. Commit + push on topic branch only
 3. `gh pr create --base main`
 4. CI green
-5. `npm run wait-for-bots` until exit **0** ? **gemini, codex, and sourcery** must each post since anchor, then quiet window (after new PR; `--bot-tag` after @mentioning bots). Exit **1** = missing required bots at cap ? **do not merge**.
+5. `npm run wait-for-bots` until exit **0** — **gemini, codex, sourcery, and qwen** must each post since anchor, then quiet window (after new PR; `--bot-tag` after @mentioning bots **and** `@qwen-review`). Exit **1** = missing required bots at cap — **do not merge**.
 5b. `## Feedback plan` then one push then in-thread replies
 6. Thread closure ? every **substantive** inline thread (bot or human) gets in-thread implement/defer/decline; resolve GitHub threads before merge. **Substantive** = file-level inline comment, P1/P2 bot finding, CI failure tied to the PR, or any thread proposing a code/doc change (exclude pure summary-only bot posts).
 7. `npm run pr:bot-feedback-check -- --pr <n>` ? exit non-zero blocks merge

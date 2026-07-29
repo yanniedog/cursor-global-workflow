@@ -1,6 +1,6 @@
 /**
  * Required-bot aliases for wait-for-bots and pr-bot-feedback-check.
- * Keys are short names (gemini, codex, sourcery, cursor); values are GitHub logins to match.
+ * Keys are short names (gemini, codex, sourcery, qwen, cursor); values are GitHub logins to match.
  */
 export const BOT_ALIASES = {
   gemini: [
@@ -11,10 +11,11 @@ export const BOT_ALIASES = {
   ],
   codex: ['chatgpt-codex-connector', 'chatgpt-codex-connector[bot]'],
   sourcery: ['sourcery-ai', 'sourcery-ai[bot]'],
+  qwen: ['github-actions[bot]'],
   cursor: ['github-actions[bot]'],
 };
 
-export const DEFAULT_REQUIRED_KEYS = ['gemini', 'codex', 'sourcery'];
+export const DEFAULT_REQUIRED_KEYS = ['gemini', 'codex', 'sourcery', 'qwen'];
 
 export const OPTIONAL_BOT_LOGINS = [
   'github-actions[bot]',
@@ -23,8 +24,13 @@ export const OPTIONAL_BOT_LOGINS = [
   'greptile-apps[bot]',
 ];
 
+export function isQwenCodeReviewBody(bodyRaw) {
+  return /<!--\s*(qwen-code-review|cursor-auto-review)\s*-->/i.test(String(bodyRaw || ''));
+}
+
+/** @deprecated Use isQwenCodeReviewBody — accepts legacy cursor-auto-review marker too. */
 export function isCursorAutoReviewBody(bodyRaw) {
-  return /<!--\s*cursor-auto-review\s*-->/i.test(String(bodyRaw || ''));
+  return isQwenCodeReviewBody(bodyRaw);
 }
 
 export function parseRequiredKeys(raw) {
