@@ -58,6 +58,13 @@ function run(command, args, options = {}) {
   return (result.stdout || '').trim();
 }
 
+function runNpm(args, options = {}) {
+  if (process.platform === 'win32') {
+    return run(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'npm', ...args], options);
+  }
+  return run('npm', args, options);
+}
+
 function workflow(setupCommand, verifyCommand) {
   const setup = setupCommand
     ? `      - name: Setup\n        run: ${JSON.stringify(setupCommand)}\n`
@@ -182,7 +189,7 @@ read-only Actions permissions, and advisory-reviewer variables.`);
     },
   };
   writeFileSync(join(target, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
-  run('npm', ['install', '--package-lock-only', '--ignore-scripts'], { cwd: target });
+  runNpm(['install', '--package-lock-only', '--ignore-scripts'], { cwd: target });
 
   run('git', ['init', '-b', 'main'], { cwd: target });
   run('git', ['add', '-A'], { cwd: target });
