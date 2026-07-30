@@ -22,11 +22,10 @@ permissions:
   pull-requests: read
 
 concurrency:
-  # Grouping by PR prevents every pushed head from occupying its own runner.
-  # Keep one running check plus GitHub's single coalesced pending run: cancelling
-  # event bursts can leave CANCELLED selected as the required head context.
+  # Single-shot checks make cancel-and-replace safe: only the newest evaluation
+  # for this PR matters, and stale heads cannot hold a runner.
   group: bot-feedback-gate-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   bot-feedback-gate:
@@ -35,7 +34,7 @@ jobs:
       || github.event.review != null
       || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -56,16 +55,21 @@ jobs:
             *)                 PR="$EVENT_PR" ;;
           esac
           [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::Pull request number must be numeric"; exit 1; }
-          for attempt in $(seq 1 40); do
-            set +e
-            node "$SCRIPT" --pr "$PR" --skip-bot-presence
-            code=$?
-            set -e
-            if [ "$code" -eq 0 ]; then
-              exit 0
-            fi
-            echo "Review feedback is still open (attempt $attempt/40); keeping the required check pending."
-            sleep 60
-          done
-          echo "::error::Substantive review feedback remained open for 40 minutes."
-          exit 1
+          PR_STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq .state)
+          if [ "$PR_STATE" != "open" ]; then
+            echo "PR #$PR is $PR_STATE - stale review event skipped"
+            exit 0
+          fi
+          set +e
+          node "$SCRIPT" --pr "$PR" --skip-bot-presence
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+          if [ "$code" -eq 2 ]; then
+            echo "::error::GitHub API rate limit prevented the feedback audit; rerun this check."
+          else
+            echo "::error::Substantive review feedback remains open. Reply and resolve it; the reply event will re-run this gate."
+          fi
+          exit "$code"
