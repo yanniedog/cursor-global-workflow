@@ -13,6 +13,11 @@ import {
   fetchRequiredCi,
   gateShipCloseoutSubgates,
 } from './lib/pr-gates-lib.mjs';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 assert.equal(evaluateDefaultBase('main', 'main').covered, true);
 assert.equal(evaluateDefaultBase('feature/base', 'main').covered, false);
@@ -105,5 +110,11 @@ assert.deepEqual(
   },
 );
 assert.equal(classifyPostProgressState({ state: 'CLOSED' }, 7).mode, 'actionable');
+const armSource = readFileSync(join(root, 'scripts', 'lib', 'pr-arm-and-park-lib.mjs'), 'utf8');
+assert.match(
+  armSource,
+  /const gates = evaluateGates\(prNumber\);[\s\S]*fetchPrMergeMeta\(prNumber, \{ requireOpen: false \}\)[\s\S]*classifyPostProgressState\(refreshed, prNumber\)/,
+);
+assert.match(armSource, /!opts\.dryRun[\s\S]*progressionAutoMergeSucceeded/);
 
 console.log('pr arm-and-park verification passed');

@@ -56,7 +56,7 @@ function protectionPayload(existing, contexts) {
   const reviews = existing?.required_pull_request_reviews;
   return {
     required_status_checks: {
-      strict: existing?.required_status_checks?.strict ?? true,
+      strict: true,
       contexts,
     },
     enforce_admins: existing?.enforce_admins?.enabled ?? true,

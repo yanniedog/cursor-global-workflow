@@ -9,7 +9,7 @@ on:
   pull_request_review:
     types: [submitted]
   pull_request_review_comment:
-    types: [created]
+    types: [created, edited, deleted]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -55,18 +55,29 @@ jobs:
             *)                 PR="$EVENT_PR" ;;
           esac
           [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::Pull request number must be numeric"; exit 1; }
-          PR_STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq .state)
+          if ! PR_STATE=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR" --jq .state); then
+            echo "::error::GitHub API could not read PR state; retry this check."
+            exit 2
+          fi
           if [ "$PR_STATE" != "open" ]; then
             echo "PR #$PR is $PR_STATE - stale review event skipped"
             exit 0
           fi
-          set +e
-          node "$SCRIPT" --pr "$PR" --skip-bot-presence
-          code=$?
-          set -e
-          if [ "$code" -eq 0 ]; then
-            exit 0
-          fi
+          code=1
+          for attempt in 1 2 3 4; do
+            set +e
+            node "$SCRIPT" --pr "$PR" --skip-bot-presence
+            code=$?
+            set -e
+            if [ "$code" -eq 0 ]; then
+              exit 0
+            fi
+            if [ "$code" -ne 1 ] || [ "$attempt" -eq 4 ]; then
+              break
+            fi
+            echo "Feedback still open; retrying shortly in case a reply-triggered run preceded thread resolution."
+            sleep 5
+          done
           if [ "$code" -eq 2 ]; then
             echo "::error::GitHub API rate limit prevented the feedback audit; rerun this check."
           else

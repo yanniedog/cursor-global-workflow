@@ -141,6 +141,12 @@ read-only Actions permissions, and advisory-reviewer variables.`);
     join(root, 'templates', '00-use-global-workflow.mdc'),
     join(target, '.cursor', 'rules', '00-use-global-workflow.mdc'),
   );
+  const workflowPolicy = readFileSync(join(root, 'templates', 'WORKFLOW.md'), 'utf8')
+    .replaceAll('{PROJECT_NAME}', args.name)
+    .replaceAll('{VERIFY_COMMAND}', args.verifyCommand)
+    .replaceAll('{DEPLOY_COMMAND}', 'Not configured')
+    .replaceAll('{DEPLOY_URL}', 'Not configured');
+  writeFileSync(join(target, 'WORKFLOW.md'), workflowPolicy, 'utf8');
 
   for (const rel of [
     'pr-arm-and-park.mjs',
@@ -163,7 +169,7 @@ read-only Actions permissions, and advisory-reviewer variables.`);
     private: true,
     type: 'module',
     scripts: {
-      test: args.verifyCommand,
+      test: 'node --test',
       'wait-for-bots': 'node scripts/wait_for_bots.mjs',
       'pr:bot-feedback-check': 'node scripts/pr-bot-feedback-check.mjs',
       'pr:bot-feedback-audit':
@@ -176,6 +182,7 @@ read-only Actions permissions, and advisory-reviewer variables.`);
     },
   };
   writeFileSync(join(target, 'package.json'), `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
+  run('npm', ['install', '--package-lock-only', '--ignore-scripts'], { cwd: target });
 
   run('git', ['init', '-b', 'main'], { cwd: target });
   run('git', ['add', '-A'], { cwd: target });
