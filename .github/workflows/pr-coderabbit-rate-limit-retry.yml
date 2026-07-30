@@ -25,7 +25,7 @@ permissions:
 
 concurrency:
   group: pr-coderabbit-rate-limit-retry-${{ github.event.issue.number || inputs.pr_number || github.run_id }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   retry-after-rate-limit:
@@ -49,6 +49,7 @@ jobs:
       - name: Wait for CodeRabbit quota then re-request review
         env:
           GH_TOKEN: ${{ secrets.BOT_GATE_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
           INPUT_PR: ${{ inputs.pr_number }}
           ISSUE_PR: ${{ github.event.issue.number }}
@@ -86,8 +87,8 @@ jobs:
           BODY="${COMMENT_BODY:-}"
           CREATED="${COMMENT_CREATED_AT:-}"
           if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ -z "$BODY" ]; then
-            META="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
-              --jq '[.[] | select((.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
+            META="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate --slurp \
+              | jq -c '[.[][] | select((.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
                 and (.body|test("Review limit reached|rate limited by coderabbit|reached your PR review limit";"i")))]
                 | sort_by(.created_at) | reverse | .[0] // empty | {body, created_at}')"
             if [ -z "$META" ] || [ "$META" = "null" ]; then
@@ -98,9 +99,9 @@ jobs:
             CREATED="$(printf '%s' "$META" | jq -r .created_at)"
           fi
 
-          REVIEWED_AFTER="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" --paginate \
-            --jq --arg after "$CREATED" '
-              [.[] | select((.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
+          REVIEWED_AFTER="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" --paginate --slurp \
+            | jq --arg after "$CREATED" '
+              [ .[][] | select((.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
                 and .submitted_at > $after
                 and (.state=="COMMENTED" or .state=="APPROVED" or .state=="CHANGES_REQUESTED")
                 and ((.body // "") | test("Review limit reached|rate limited by coderabbit";"i") | not))]
@@ -110,11 +111,11 @@ jobs:
             exit 0
           fi
 
-          ARMED="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
-            --jq --arg after "$CREATED" --arg marker "$RETRY_MARKER" '
-              ( [.[] | select(.created_at > $after and (.body|contains($marker)) and (.body|test("@coderabbitai\\s+review";"i")))]
+          ARMED="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate --slurp \
+            | jq --arg after "$CREATED" --arg marker "$RETRY_MARKER" '
+              ( [ .[][] | select(.created_at > $after and (.body|contains($marker)) and (.body|test("@coderabbitai\\s+review";"i")))]
                 | map(.created_at) | max ) as $retry
-              | ( [.[] | select(.created_at > $after
+              | ( [ .[][] | select(.created_at > $after
                     and (.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
                     and (.body|test("Review limit reached|rate limited by coderabbit";"i")))]
                   | map(.created_at) | max ) as $newer
@@ -127,45 +128,45 @@ jobs:
           fi
 
           WAIT_MIN="$(BODY="$BODY" python3 - <<'PY'
-import os, re
-text = os.environ.get("BODY") or ""
-patterns = [
-    r"next review available in[:\s*]*\*?\*?(\d+)\s*minutes?",
-    r"more reviews will be available in\s+(\d+)\s*minutes?",
-    r"available in[:\s*]*\*?\*?(\d+)\s*minutes?",
-    r"next review available in[:\s*]*\*?\*?(\d+)\s*hours?",
-    r"more reviews will be available in\s+(\d+)\s*hours?",
-    r"available in[:\s*]*\*?\*?(\d+)\s*hours?",
-]
-for pat in patterns:
-    m = re.search(pat, text, re.I)
-    if not m:
-        continue
-    n = int(m.group(1))
-    if re.search(r"hours?", m.group(0), re.I) and not re.search(r"minutes?", m.group(0), re.I):
-        print(n * 60)
-    else:
-        print(n)
-    raise SystemExit
-print(60)
-PY
-)"
+          import os, re
+          text = os.environ.get("BODY") or ""
+          patterns = [
+              r"next review available in[:\s*]*\*?\*?(\d+)\s*minutes?",
+              r"more reviews will be available in\s+(\d+)\s*minutes?",
+              r"available in[:\s*]*\*?\*?(\d+)\s*minutes?",
+              r"next review available in[:\s*]*\*?\*?(\d+)\s*hours?",
+              r"more reviews will be available in\s+(\d+)\s*hours?",
+              r"available in[:\s*]*\*?\*?(\d+)\s*hours?",
+          ]
+          for pat in patterns:
+              m = re.search(pat, text, re.I)
+              if not m:
+                  continue
+              n = int(m.group(1))
+              if re.search(r"hours?", m.group(0), re.I) and not re.search(r"minutes?", m.group(0), re.I):
+                  print(n * 60)
+              else:
+                  print(n)
+              raise SystemExit
+          print(60)
+          PY
+          )"
 
           BUFFER_MIN=2
           MAX_WAIT_MIN=120
           SLEEP_SEC="$(CREATED="$CREATED" WAIT_MIN="$WAIT_MIN" BUFFER_MIN="$BUFFER_MIN" MAX_WAIT_MIN="$MAX_WAIT_MIN" python3 - <<'PY'
-import os, datetime
-created = os.environ["CREATED"]
-wait = int(os.environ["WAIT_MIN"])
-buf = int(os.environ["BUFFER_MIN"])
-max_wait = int(os.environ["MAX_WAIT_MIN"])
-ts = datetime.datetime.fromisoformat(created.replace("Z", "+00:00"))
-ready = ts + datetime.timedelta(minutes=wait + buf)
-now = datetime.datetime.now(datetime.timezone.utc)
-sec = max(0, int((ready - now).total_seconds()))
-print(min(sec, max_wait * 60))
-PY
-)"
+          import os, datetime
+          created = os.environ["CREATED"]
+          wait = int(os.environ["WAIT_MIN"])
+          buf = int(os.environ["BUFFER_MIN"])
+          max_wait = int(os.environ["MAX_WAIT_MIN"])
+          ts = datetime.datetime.fromisoformat(created.replace("Z", "+00:00"))
+          ready = ts + datetime.timedelta(minutes=wait + buf)
+          now = datetime.datetime.now(datetime.timezone.utc)
+          sec = max(0, int((ready - now).total_seconds()))
+          print(min(sec, max_wait * 60))
+          PY
+          )"
 
           echo "PR #$PR rate-limited at ${CREATED}; wait_min=${WAIT_MIN}; sleep_sec=${SLEEP_SEC}"
           if [ "${NO_SLEEP:-false}" != "true" ] && [ "${SLEEP_SEC}" -gt 0 ]; then
@@ -186,9 +187,9 @@ PY
             exit 0
           fi
 
-          REVIEWED_AFTER="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" --paginate \
-            --jq --arg after "$CREATED" '
-              [.[] | select((.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
+          REVIEWED_AFTER="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" --paginate --slurp \
+            | jq --arg after "$CREATED" '
+              [ .[][] | select((.user.login=="coderabbitai[bot]" or .user.login=="coderabbitai")
                 and .submitted_at > $after
                 and (.state=="COMMENTED" or .state=="APPROVED" or .state=="CHANGES_REQUESTED")
                 and ((.body // "") | test("Review limit reached|rate limited by coderabbit";"i") | not))]
