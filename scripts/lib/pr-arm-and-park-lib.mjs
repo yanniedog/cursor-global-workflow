@@ -39,6 +39,39 @@ export function classifyWorkMode(gatesResult) {
   return { mode, actionable, waiting, gates: gatesResult.gates || [] };
 }
 
+export function classifyPostProgressState(meta, prNumber) {
+  if (!meta || meta.state === 'OPEN') return null;
+  if (meta.state === 'MERGED') {
+    return {
+      mode: 'ready',
+      merged: true,
+      classification: {
+        mode: 'ready',
+        actionable: [],
+        waiting: [],
+        gates: [{
+          id: 'terminal-state',
+          pass: true,
+          detail: `PR #${prNumber} merged while auto-merge was being armed`,
+        }],
+      },
+    };
+  }
+  return {
+    mode: 'actionable',
+    merged: false,
+    classification: {
+      mode: 'actionable',
+      actionable: [{
+        id: 'branch-fresh',
+        pass: false,
+        detail: `PR #${prNumber} changed state unexpectedly (${meta.state})`,
+      }],
+      waiting: [],
+    },
+  };
+}
+
 export function armAndParkOnce(prNumber, opts = {}) {
   let meta;
   try {
@@ -84,9 +117,33 @@ export function armAndParkOnce(prNumber, opts = {}) {
     };
   }
 
+  let postProgress = null;
+  try {
+    postProgress = fetchPrMergeMeta(prNumber, { requireOpen: false });
+  } catch {
+    // Gate evaluation below reports a hard API/auth failure if the PR is still open.
+  }
+  const terminal = classifyPostProgressState(postProgress, prNumber);
+  if (terminal?.merged) {
+    return {
+      ...terminal,
+      progression,
+      baseGuard,
+      autoMergeArmed: progression.autoMerge?.ok === true,
+    };
+  }
+  if (terminal) {
+    return {
+      ...terminal,
+      progression,
+      baseGuard,
+      autoMergeArmed: false,
+    };
+  }
+
   const gates = evaluateGates(prNumber);
   const classification = classifyWorkMode(gates);
-  let refreshed = meta;
+  let refreshed = postProgress || meta;
   try {
     refreshed = fetchPrMergeMeta(prNumber);
   } catch {
