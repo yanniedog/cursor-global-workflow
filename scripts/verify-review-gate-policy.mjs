@@ -10,6 +10,10 @@ import {
   resolveRequiredKeys,
 } from './lib/bot-wait-config.mjs';
 import { BOT_GATE_CHECK_NAMES } from './lib/pr-gates-lib.mjs';
+import {
+  combineRequiredCheckState,
+  evaluateRequiredCheckState,
+} from './lib/required-ci-checks.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (path) => readFileSync(join(root, path), 'utf8');
@@ -40,10 +44,59 @@ for (const workflow of [
   assert.doesNotMatch(yaml, /^\s{2}pr-bot-feedback-check:/m);
   assert.match(yaml, /persist-credentials: false/);
   assert.match(yaml, /group:\s*bot-feedback-gate-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*inputs\.pr_number\s*\|\|\s*github\.run_id\s*\}\}/);
-  assert.match(yaml, /cancel-in-progress:\s*false/);
+  assert.match(yaml, /cancel-in-progress:\s*true/);
   assert.doesNotMatch(yaml, /pull_request\.head\.sha/);
   assert.doesNotMatch(yaml, /queue:\s*max/);
+  assert.match(yaml, /timeout-minutes:\s*5/);
+  assert.match(yaml, /PR_STATE=\$\(gh api/);
+  assert.doesNotMatch(yaml, /seq\s+1\s+40|sleep\s+60/);
 }
+
+assert.deepEqual(
+  evaluateRequiredCheckState({
+    requiredNames: ['repo-ci', 'bot-feedback-gate'],
+    prChecks: [],
+    headCheckRuns: [{
+      id: 10,
+      name: 'repo-ci',
+      status: 'queued',
+      started_at: '2026-01-01T00:00:00Z',
+    }],
+  }),
+  {
+    pending: true,
+    failed: false,
+    failedNames: [],
+    pendingNames: ['repo-ci', 'bot-feedback-gate'],
+    missingNames: ['bot-feedback-gate'],
+    checks: [{ name: 'repo-ci', state: 'pending' }],
+  },
+);
+assert.equal(
+  evaluateRequiredCheckState({
+    requiredNames: ['repo-ci'],
+    prChecks: [{
+      name: 'repo-ci',
+      bucket: 'pass',
+      startedAt: '2026-01-01T00:00:00Z',
+    }],
+    headCheckRuns: [{
+      id: 11,
+      name: 'repo-ci',
+      status: 'in_progress',
+      started_at: '2026-01-01T00:01:00Z',
+    }],
+  }).pending,
+  true,
+);
+assert.deepEqual(
+  combineRequiredCheckState({
+    protectionOk: false,
+    rulesOk: false,
+    fallbackRequiredNames: ['repo-ci', 'bot-feedback-gate'],
+  }).values,
+  ['repo-ci', 'bot-feedback-gate'],
+);
 
 const bootstrap = read('scripts/lib/repo-bootstrap.mjs');
 assert.match(bootstrap, /pr-bot-feedback-check\.yml/);

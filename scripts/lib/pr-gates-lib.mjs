@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { hasGh, ghJson, repoSlug } from './gh-pr-review-threads.mjs';
 import { fetchPrMergeMeta, gateAutoMergeEnabled, gateBranchFreshMeta } from './pr-branch-sync.mjs';
 import { gateExemptReason } from './pr-gate-exempt.mjs';
+import { fetchRequiredCheckState } from './required-ci-checks.mjs';
 import { runWorkflowScript } from './workflow-paths.mjs';
 
 export const BOT_GATE_CHECK_NAMES = ['bot-feedback-gate'];
@@ -96,46 +97,37 @@ export function resolvePrNumber(prArg) {
 }
 
 export function fetchRequiredCi(prNumber) {
-  const r = spawnSync(
-    'gh',
-    ['pr', 'checks', String(prNumber), '--required', '--json', 'name,bucket,state'],
-    { encoding: 'utf8' },
-  );
-  if (r.status === 8) {
-    return { ok: true, pending: true, failed: false, failedNames: [], checks: [] };
+  let pr;
+  let repo;
+  try {
+    pr = ghJson([
+      'pr',
+      'view',
+      String(prNumber),
+      '--json',
+      'headRefOid,baseRefName',
+    ]);
+    repo = repoSlug();
+  } catch (error) {
+    return { ok: false, error: error.message };
   }
-  if (r.status !== 0) {
-    const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
-    if (/no checks reported/i.test(msg) || /no required checks reported/i.test(msg)) {
-      return {
-        ok: true,
-        pending: true,
-        missing: true,
-        failed: false,
-        failedNames: [],
-        checks: [],
-      };
-    }
-    return { ok: false, error: msg };
-  }
-  const checks = JSON.parse(r.stdout || '[]');
-  let pending = false;
-  let failed = false;
-  const failedNames = [];
-  for (const c of checks) {
-    if (c.bucket === 'pending') pending = true;
-    if (
-      c.bucket === 'fail' ||
-      c.bucket === 'cancel' ||
-      c.state === 'FAILURE' ||
-      c.state === 'ERROR' ||
-      c.state === 'CANCELLED'
-    ) {
-      failed = true;
-      failedNames.push(c.name);
-    }
-  }
-  return { ok: true, pending, failed, failedNames, checks };
+  const fallbackRequiredNames = (process.env.PR_REQUIRED_CHECKS || 'bot-feedback-gate')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const result = fetchRequiredCheckState({
+    prNumber,
+    repo: `${repo.owner}/${repo.name}`,
+    headSha: pr.headRefOid,
+    baseRefName: pr.baseRefName,
+    fallbackRequiredNames,
+  });
+  if (result.error) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    ...result,
+    missing: result.missingNames.length > 0,
+  };
 }
 
 export function fetchNamedChecks(prNumber, names) {

@@ -81,8 +81,8 @@ assert.equal(
 );
 assert.match(
   fetchRequiredCi.toString(),
-  /missing:\s*true/,
-  'a newly-ready head without registered required checks must park instead of reporting ready',
+  /fetchRequiredCheckState/,
+  'required checks must be evaluated against the exact current PR head',
 );
 assert.deepEqual(
   classifyPostProgressState({ state: 'MERGED' }, 7),
