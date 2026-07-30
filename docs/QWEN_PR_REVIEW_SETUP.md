@@ -1,6 +1,6 @@
 # Qwen Code PR Review (self-hosted Ollama)
 
-Uses a **self-hosted Windows runner** on the machine that runs Ollama, calling the local OpenAI-compatible API (`http://127.0.0.1:11434/v1`) with **`qwen2.5-coder-review:7b`**.
+Uses a **self-hosted Windows runner** on the machine that runs Ollama, calling its native JSON chat API (`http://127.0.0.1:11434/api/chat`) with **`qwen2.5-coder-review:7b`**.
 
 This matches the simjury `pr-local-llm-review` pattern (`runs-on: [self-hosted, Windows, X64, …]`).
 
@@ -8,7 +8,7 @@ This matches the simjury `pr-local-llm-review` pattern (`runs-on: [self-hosted, 
 
 1. Ollama installed with the review model:
    `ollama create qwen2.5-coder-review:7b -f scripts/qwen-review.Modelfile`.
-   This pins a 32,768-token context instead of relying on Ollama's
+   This pins an 8,192-token context instead of relying on Ollama's
    hardware-derived default.
 2. Self-hosted runner registered to the repo with label **`qwen-local-llm`** (example: `C:\actions-runner-cgw`, agent `surface-laptop-5-qwen-cgw`).
 3. Runner process online (`gh api repos/<owner>/<repo>/actions/runners`).
@@ -42,7 +42,7 @@ gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen2.5-coder-review:7b'
   fork a token or executing any PR-controlled code.
 - Posts a new formal review for each head with `<!-- qwen-code-review -->`, the
   exact reviewed commit, outcome, model, file coverage, and workflow URL.
-- Reviews every reviewable file in bounded 24,000-character chunks. If the
+- Reviews every reviewable file in bounded 12,000-character chunks. If the
   160,000-character whole-PR budget would omit a reviewable file, the run fails
   instead of publishing a partial success. Generated, lock, documentation, and
   asset files are reported separately as intentional low-signal exclusions.
@@ -66,4 +66,4 @@ Required bots default: `gemini,codex,sourcery,qwen`.
 | Job queued forever | Start runner: `C:\actions-runner-cgw\run.cmd`; confirm label `qwen-local-llm` |
 | Connection refused | Ensure Ollama is running (`ollama list`, port 11434) |
 | Slow / timeout | Keep Ollama warm and confirm no larger model is consuming the CPU runner |
-| Review reports `Operation not allowed` | Recreate `qwen2.5-coder-review:7b` from the checked-in Modelfile and confirm `ollama ps` shows context `32768` |
+| Review reports `Operation not allowed` | Recreate `qwen2.5-coder-review:7b` from the checked-in Modelfile and confirm `ollama ps` shows context `8192` |

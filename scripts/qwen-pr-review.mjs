@@ -10,9 +10,9 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_MODEL = 'qwen2.5-coder-review:7b';
-const DEFAULT_BASE_URL = 'http://127.0.0.1:11434/v1';
+const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
 const DEFAULT_DIFF_MAX = 160_000;
-const DEFAULT_CHUNK_MAX = 24_000;
+const DEFAULT_CHUNK_MAX = 12_000;
 const MAX_FINDINGS = 8;
 
 function fail(message) {
@@ -30,8 +30,9 @@ function runGit(args) {
 }
 
 function normalizeBaseUrl(raw) {
-  const value = String(raw || DEFAULT_BASE_URL).replace(/\/+$/, '');
-  return /\/v1$/i.test(value) ? value : `${value}/v1`;
+  return String(raw || DEFAULT_BASE_URL)
+    .replace(/\/+$/, '')
+    .replace(/\/v1$/i, '');
 }
 
 export function isReviewablePath(filePath) {
@@ -42,7 +43,7 @@ export function isReviewablePath(filePath) {
   ) return false;
   return (
     /\.(?:[cm]?[jt]sx?|json|ya?ml|gradle|properties|xml|kt|java|sh|ps1)$/i.test(path) ||
-    /(^|\/)(?:Dockerfile|Podfile)$/i.test(path)
+    /(^|\/)(?:Dockerfile|Podfile|[^/]+\.Modelfile)$/i.test(path)
   );
 }
 
@@ -188,20 +189,28 @@ async function requestFindings({ baseUrl, apiKey, model, userContent }) {
   const configuredTimeout = Number(process.env.QWEN_TIMEOUT_MS || 600_000);
   const timeoutMs =
     Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : 600_000;
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const configuredContext = Number(process.env.QWEN_CONTEXT_TOKENS || 8_192);
+  const contextTokens =
+    Number.isFinite(configuredContext) && configuredContext >= 4_096 ? configuredContext : 8_192;
+  const response = await fetch(`${baseUrl}/api/chat`, {
     method: 'POST',
     headers,
     signal: AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       model,
-      temperature: 0,
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
+      stream: false,
+      format: 'json',
+      keep_alive: '30m',
+      options: {
+        temperature: 0,
+        num_predict: 250,
+        num_ctx: contextTokens,
+      },
       messages: [
         {
           role: 'system',
           content:
-            'Find only concrete PR-introduced defects. Return strict JSON with at most three highest-severity findings for this chunk. Never summarize.',
+            'Find only concrete PR-introduced defects. Return strict JSON with at most one highest-severity finding for this chunk. Never summarize.',
         },
         { role: 'user', content: userContent },
       ],
@@ -215,7 +224,7 @@ async function requestFindings({ baseUrl, apiKey, model, userContent }) {
   } catch {
     fail(`Qwen API returned invalid JSON envelope: ${raw.slice(0, 500)}`);
   }
-  const content = envelope?.choices?.[0]?.message?.content || envelope?.choices?.[0]?.text || '';
+  const content = envelope?.message?.content || '';
   return parseModelJson(content).findings;
 }
 
@@ -258,6 +267,15 @@ async function main() {
         ? configuredChunkMax
         : DEFAULT_CHUNK_MAX;
     const chunks = chunkSections(diff.sections, chunkMax);
+    const oversizedSections = diff.sections
+      .filter((section) => section.text.length > chunkMax)
+      .map((section) => section.path);
+    if (oversizedSections.length > 0) {
+      fail(
+        `Qwen review chunk budget cannot safely fit file(s): ${oversizedSections.join(', ')}. ` +
+          'Split the pull request before accepting the review.',
+      );
+    }
     chunkCount = chunks.length;
     const rawFindings = [];
     for (const [index, chunk] of chunks.entries()) {
