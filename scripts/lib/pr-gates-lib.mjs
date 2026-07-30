@@ -130,37 +130,6 @@ export function fetchRequiredCi(prNumber) {
   };
 }
 
-export function fetchNamedChecks(prNumber, names) {
-  const r = spawnSync(
-    'gh',
-    ['pr', 'checks', String(prNumber), '--json', 'name,bucket,state,completedAt'],
-    { encoding: 'utf8' },
-  );
-  if (r.status !== 0) {
-    const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
-    if (/no checks reported/i.test(msg)) return { found: {}, skipped: true };
-    return { found: {}, error: msg };
-  }
-  const all = JSON.parse(r.stdout || '[]');
-  const want = new Set(names.map((n) => n.toLowerCase()));
-  const found = {};
-  for (const c of all) {
-    const lower = (c.name || '').toLowerCase();
-    const tail = lower.includes('/') ? lower.slice(lower.lastIndexOf('/') + 1) : lower;
-    for (const key of want) {
-      if (lower === key || tail === key) found[key] = c;
-    }
-  }
-  return { found };
-}
-
-function checkBucketPass(c) {
-  if (!c) return null;
-  if (c.bucket === 'pass' || c.state === 'SUCCESS') return true;
-  if (c.bucket === 'pending' || c.state === 'PENDING' || c.state === 'IN_PROGRESS') return false;
-  return false;
-}
-
 export function gateCiRequired(prNumber) {
   const ci = fetchRequiredCi(prNumber);
   if (!ci.ok) {
@@ -189,41 +158,32 @@ export function gateCiRequired(prNumber) {
 }
 
 export function gateGithubBotChecks(prNumber) {
-  const { found, error, skipped } = fetchNamedChecks(prNumber, BOT_GATE_CHECK_NAMES);
-  if (error) {
+  const exact = fetchRequiredCi(prNumber);
+  if (!exact.ok) {
     return {
       id: 'github-bot-gates',
       pass: false,
-      detail: error,
+      detail: exact.error,
       action: 'Ensure the pr-bot-feedback-check workflow ran on the PR head',
     };
   }
-  if (skipped || !BOT_GATE_CHECK_NAMES.some((name) => found[name])) {
-    return {
-      id: 'github-bot-gates',
-      pass: true,
-      detail: 'No GitHub bot gate checks reported; relying on local wait/thread gates',
-      skipped: true,
-    };
-  }
+  const failed = new Set(exact.failedNames || []);
+  const pending = new Set(exact.pendingNames || []);
+  const missing = new Set(exact.missingNames || []);
   const parts = [];
   let pass = true;
   for (const name of BOT_GATE_CHECK_NAMES) {
-    const c = found[name];
-    if (!c) {
+    if (missing.has(name)) {
       parts.push(`${name}: not reported yet`);
       pass = false;
-      continue;
-    }
-    const ok = checkBucketPass(c);
-    if (ok === true) {
-      parts.push(`${name}: pass`);
-    } else if (ok === false) {
-      parts.push(`${name}: ${c.bucket || c.state}`);
+    } else if (failed.has(name)) {
+      parts.push(`${name}: failure`);
+      pass = false;
+    } else if (pending.has(name)) {
+      parts.push(`${name}: pending`);
       pass = false;
     } else {
-      parts.push(`${name}: ${c.bucket || c.state} (failed)`);
-      pass = false;
+      parts.push(`${name}: pass`);
     }
   }
   return {
