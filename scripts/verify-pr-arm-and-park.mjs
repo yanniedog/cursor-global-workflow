@@ -7,7 +7,10 @@ import {
 } from './lib/pr-arm-and-park-lib.mjs';
 import { shouldMarkReady } from './lib/pr-branch-sync.mjs';
 import { evaluateDefaultBase } from './lib/pr-base-guard.mjs';
-import { gateShipCloseoutSubgates } from './lib/pr-gates-lib.mjs';
+import {
+  fetchRequiredCi,
+  gateShipCloseoutSubgates,
+} from './lib/pr-gates-lib.mjs';
 
 assert.equal(evaluateDefaultBase('main', 'main').covered, true);
 assert.equal(evaluateDefaultBase('feature/base', 'main').covered, false);
@@ -58,6 +61,11 @@ assert.equal(classifyPostProgressState({ state: 'OPEN' }, 7), null);
 assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: true }), true);
 assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: false }), false);
 assert.equal(shouldMarkReady({ state: 'MERGED', isDraft: true }), false);
+assert.match(
+  fetchRequiredCi.toString(),
+  /missing:\s*true/,
+  'a newly-ready head without registered required checks must park instead of reporting ready',
+);
 assert.deepEqual(
   classifyPostProgressState({ state: 'MERGED' }, 7),
   {

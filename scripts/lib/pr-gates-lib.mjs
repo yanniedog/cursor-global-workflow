@@ -107,7 +107,14 @@ export function fetchRequiredCi(prNumber) {
   if (r.status !== 0) {
     const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
     if (/no checks reported/i.test(msg) || /no required checks reported/i.test(msg)) {
-      return { ok: true, pending: false, failed: false, failedNames: [], checks: [] };
+      return {
+        ok: true,
+        pending: true,
+        missing: true,
+        failed: false,
+        failedNames: [],
+        checks: [],
+      };
     }
     return { ok: false, error: msg };
   }
@@ -179,7 +186,9 @@ export function gateCiRequired(prNumber) {
     return {
       id: 'ci-required',
       pass: false,
-      detail: 'Required checks still pending',
+      detail: ci.missing
+        ? 'Required checks have not reported on the current head yet'
+        : 'Required checks still pending',
       action: 'CI is pending; park without polling and re-run pr:arm-and-park on wake',
     };
   }
