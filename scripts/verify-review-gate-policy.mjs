@@ -43,6 +43,10 @@ for (const workflow of [
   assert.match(yaml, /^\s{2}bot-feedback-gate:/m);
   assert.doesNotMatch(yaml, /^\s{2}pr-bot-feedback-check:/m);
   assert.match(yaml, /persist-credentials: false/);
+  assert.match(
+    yaml,
+    /ref:\s*\$\{\{\s*github\.event\.pull_request\.base\.sha\s*\|\|\s*github\.event\.repository\.default_branch\s*\}\}/,
+  );
   assert.doesNotMatch(yaml, /^concurrency:/m);
   assert.doesNotMatch(yaml, /pull_request\.head\.sha/);
   assert.doesNotMatch(yaml, /queue:\s*max/);
