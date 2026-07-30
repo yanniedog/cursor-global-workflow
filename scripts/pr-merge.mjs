@@ -63,7 +63,13 @@ Requires gates green (npm run pr:gates:check -- --pr <n>).`);
   }
 
   const syncBranch = !args.noSync && !args.enableOnly;
-  const r = progressPullRequest(args.pr, { dryRun: args.dryRun, syncBranch, enableAuto: true });
+  const r = progressPullRequest(args.pr, {
+    dryRun: args.dryRun,
+    syncBranch,
+    enableAuto: true,
+    markReady: true,
+  });
+  if (r.ready) console.log(`ready ${r.ready.action}: ${r.ready.detail}`);
   if (r.sync && syncBranch) console.log(`sync ${r.sync.action}: ${r.sync.detail}`);
   if (r.autoMerge) console.log(`auto-merge ${r.autoMerge.action}: ${r.autoMerge.detail}`);
   if (r.blocked) process.exit(r.sync?.exitCode === 2 ? 2 : 1);

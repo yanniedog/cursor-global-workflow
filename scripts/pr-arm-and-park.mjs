@@ -47,8 +47,9 @@ Agents never use --watch or sleep-poll loops.`);
     process.exit(1);
   }
   if (!args.json) {
+    const outcome = result.merged ? 'MERGED' : result.mode.toUpperCase();
     console.log(
-      `pr:arm-and-park: PR #${pr} ${result.mode.toUpperCase()} `
+      `pr:arm-and-park: PR #${pr} ${outcome} `
       + `(auto-merge ${result.autoMergeArmed ? 'armed' : 'not armed'})`,
     );
     for (const gate of result.classification?.actionable || []) {
