@@ -38,6 +38,8 @@ gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen3-coder:30b'
 - Rejects fork PRs (private laptop reviewer).
 - Posts a new formal review for each head with `<!-- qwen-code-review -->`, the
   exact reviewed commit, outcome, model, file coverage, and workflow URL.
+- Reviews bounded diff chunks and performs a separate structured synthesis pass;
+  output without Summary, Findings, and Test Gaps is rejected as a failed review.
 - Publishes the current-head check run `qwen-code-review`; failed reviews remain
   failed and do not satisfy reviewer presence.
 
