@@ -97,7 +97,15 @@ function parseArgs(argv) {
 }
 
 function statePath(prNumber) {
-  return path.join(repoRoot(), '.git', 'ar-bot-wait', `${prNumber}.json`);
+  const relative = path.join('ar-bot-wait', `${prNumber}.json`);
+  const resolved = spawnSync('git', ['rev-parse', '--git-path', relative], {
+    encoding: 'utf8',
+  });
+  const gitPath = (resolved.stdout || '').trim();
+  if (resolved.status === 0 && gitPath) {
+    return path.isAbsolute(gitPath) ? gitPath : path.resolve(repoRoot(), gitPath);
+  }
+  return path.join(repoRoot(), '.git', relative);
 }
 
 function readState(prNumber) {
