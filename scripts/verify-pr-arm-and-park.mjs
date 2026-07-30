@@ -7,6 +7,7 @@ import {
 } from './lib/pr-arm-and-park-lib.mjs';
 import { shouldMarkReady } from './lib/pr-branch-sync.mjs';
 import { evaluateDefaultBase } from './lib/pr-base-guard.mjs';
+import { gateShipCloseoutSubgates } from './lib/pr-gates-lib.mjs';
 
 assert.equal(evaluateDefaultBase('main', 'main').covered, true);
 assert.equal(evaluateDefaultBase('feature/base', 'main').covered, false);
@@ -22,6 +23,21 @@ assert.equal(
 assert.equal(
   classifyGateFailure({ id: 'pr-bot-feedback-check', pass: false }),
   'actionable',
+);
+assert.equal(
+  classifyGateFailure({ id: 'ship-closeout-subgates', pass: false, exitCode: 2 }),
+  'waiting',
+);
+assert.equal(
+  classifyGateFailure({ id: 'ship-closeout-subgates', pass: false, exitCode: 1 }),
+  'actionable',
+);
+assert.equal(
+  gateShipCloseoutSubgates(
+    { pass: false, exitCode: 2 },
+    { pass: true, exitCode: 0 },
+  ).exitCode,
+  2,
 );
 assert.equal(
   classifyWorkMode({

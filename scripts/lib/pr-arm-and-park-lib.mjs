@@ -28,6 +28,9 @@ export function classifyGateFailure(gate) {
   if (gate.id === 'wait-for-bots') {
     return gate.exitCode === 2 ? 'waiting' : 'actionable';
   }
+  if (gate.id === 'ship-closeout-subgates') {
+    return gate.exitCode === 2 ? 'waiting' : 'actionable';
+  }
   return 'actionable';
 }
 

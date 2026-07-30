@@ -338,9 +338,11 @@ export function gateFeedbackPlan(prNumber, { skip, waitPass, feedbackPass }) {
 
 export function gateShipCloseoutSubgates(waitGate, feedbackGate) {
   const pass = waitGate.pass && feedbackGate.pass;
+  const waiting = !pass && waitGate.exitCode === 2 && feedbackGate.pass;
   return {
     id: 'ship-closeout-subgates',
     pass,
+    exitCode: pass ? 0 : waiting ? 2 : 1,
     detail: pass
       ? 'Same checks ship:closeout:strict runs on topic branches (merge blockers clear)'
       : 'ship:closeout:strict would exit 2 until wait-for-bots and pr:bot-feedback-check pass',
