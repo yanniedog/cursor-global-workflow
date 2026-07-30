@@ -1,14 +1,14 @@
 # Qwen Code PR Review (self-hosted Ollama)
 
-Uses a **self-hosted Windows runner** on the machine that runs Ollama, calling the local OpenAI-compatible API (`http://127.0.0.1:11434/v1`) with **`qwen3-coder-review:30b`**.
+Uses a **self-hosted Windows runner** on the machine that runs Ollama, calling the local OpenAI-compatible API (`http://127.0.0.1:11434/v1`) with **`qwen2.5-coder-review:7b`**.
 
 This matches the simjury `pr-local-llm-review` pattern (`runs-on: [self-hosted, Windows, X64, …]`).
 
 ## Prerequisites
 
 1. Ollama installed with the review model:
-   `ollama create qwen3-coder-review:30b -f scripts/qwen-review.Modelfile`.
-   This pins a 16,384-token context instead of relying on Ollama's
+   `ollama create qwen2.5-coder-review:7b -f scripts/qwen-review.Modelfile`.
+   This pins a 32,768-token context instead of relying on Ollama's
    hardware-derived default.
 2. Self-hosted runner registered to the repo with label **`qwen-local-llm`** (example: `C:\actions-runner-cgw`, agent `surface-laptop-5-qwen-cgw`).
 3. Runner process online (`gh api repos/<owner>/<repo>/actions/runners`).
@@ -20,12 +20,12 @@ Defaults are applied in the workflow when secrets are empty:
 | Secret | Default |
 |--------|---------|
 | `QWEN_API_BASE_URL` | `http://127.0.0.1:11434/v1` |
-| `QWEN_MODEL` | `qwen3-coder-review:30b` |
+| `QWEN_MODEL` | `qwen2.5-coder-review:7b` |
 | `QWEN_API_KEY` | unset (Ollama does not require one) |
 
 ```powershell
 gh secret set QWEN_API_BASE_URL --repo OWNER/REPO --body 'http://127.0.0.1:11434/v1'
-gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen3-coder-review:30b'
+gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen2.5-coder-review:7b'
 # Or batch:
 .\scripts\setup-qwen-pr-review.ps1
 ```
@@ -65,5 +65,5 @@ Required bots default: `gemini,codex,sourcery,qwen`.
 |---------|-----|
 | Job queued forever | Start runner: `C:\actions-runner-cgw\run.cmd`; confirm label `qwen-local-llm` |
 | Connection refused | Ensure Ollama is running (`ollama list`, port 11434) |
-| Slow / timeout | First load of 30B is slow; keep Ollama warm; workflow timeout is 45m |
-| Review reports `Operation not allowed` | Recreate `qwen3-coder-review:30b` from the checked-in Modelfile and confirm `ollama ps` shows context `16384` |
+| Slow / timeout | Keep Ollama warm and confirm no larger model is consuming the CPU runner |
+| Review reports `Operation not allowed` | Recreate `qwen2.5-coder-review:7b` from the checked-in Modelfile and confirm `ollama ps` shows context `32768` |
