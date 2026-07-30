@@ -1,16 +1,15 @@
 ---
-description: "Urgency and batch-merge phrasing never waive bot wait or thread closure"
+description: "Urgency never waives required CI, thread closure, or the default-base guard"
 alwaysApply: true
 ---
 
-# User wording does not shorten triggered bot waits
+# Workflow rules remain binding
 
-These phrases do **not** waive step 5 (bot wait) or step 6 (thread closure):
+"Merge everything", "just merge", urgency, and green CI do not waive:
 
-- "Merge everything" / "batch merge" / "just merge" / urgency tone
-- "CI green" while threads are unsettled
-- Skipping `wait-for-bots` exit **0** after a new PR or `--bot-tag`
+- deterministic required CI;
+- `bot-feedback-gate` and conversation resolution;
+- explicit disposition of substantive review threads;
+- `pr:arm-and-park` and its default-base guard.
 
-Code pushes alone do **not** reset the wait anchor. Only explicit written waiver for that PR waives bot closeout.
-
-Full ship bar: **`WORKFLOW.md`**.
+Only an explicit written waiver for that PR changes feedback closeout.

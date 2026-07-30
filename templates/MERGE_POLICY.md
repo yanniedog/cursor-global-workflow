@@ -1,45 +1,28 @@
 # Merge policy
 
-All PRs to `main` use **squash auto-merge** by default.
-
-Copy this file to your repo (e.g. `.github/MERGE_POLICY.md`) when bootstrapping from cursor-global-workflow.
-
-## Agent / automation command
-
-After ship bar gates pass (`npm run pr:bot-feedback-check -- --pr <n>` exit **0**, plus any project aggregate gate such as `pr:gates:check` if wired):
+All PRs target the default branch and use squash auto-merge.
 
 ```sh
-npm run pr:merge -- --pr <n>
-# equivalent:
-gh pr merge <n> --auto --squash --delete-branch
+npm run pr:arm-and-park -- --pr <n>
 ```
 
-`--auto` queues merge until required checks pass (and updates branch when protection requires up-to-date). Do not merge on CI green alone — complete bot wait and thread closure per `WORKFLOW.md`.
+The command verifies the default base, syncs when safe, and arms
+`--auto --squash --delete-branch`. Never replace it with a hand-written merge
+command because that bypasses the default-base guard.
 
-## `gh pr create`
+Repository settings:
 
-Squash is **not** set at PR creation. Opening a PR does not choose merge method; use the merge command above when gates pass.
+- squash merges on; merge commits and rebase merges off;
+- auto-merge and automatic head-branch deletion on;
+- strict, admin-enforced default-branch protection;
+- deterministic repository CI plus `bot-feedback-gate` required;
+- conversation resolution required;
+- force-push and protected-branch deletion off;
+- reviewer presence, Qwen/local-LLM, and external vendors advisory.
 
-## Repository settings (squash-only)
-
-Apply via API (admin token):
+Apply settings with:
 
 ```sh
 npm run repo-merge-settings:apply
+npm run branch-protection:apply
 ```
-
-Target:
-
-| Setting | Value |
-|---------|-------|
-| `allow_squash_merge` | true |
-| `allow_merge_commit` | false |
-| `allow_rebase_merge` | false |
-| `delete_branch_on_merge` | true |
-| `allow_auto_merge` | true |
-
-If the API returns 403, apply manually: **Settings → General → Pull Requests** (see script output).
-
-## Branch protection
-
-Bot gates on `main`: `npm run branch-protection:apply` (see `WORKFLOW.md`). Protection blocks merge until checks pass; it does not replace squash-only repo settings above.

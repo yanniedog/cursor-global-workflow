@@ -1,31 +1,20 @@
 ---
-description: "Generic ship bar — branch, PR, CI, bot wait, thread closure, deploy, verify"
+description: "Generic ship bar — default-base PR, CI, feedback closure, deploy, verify"
 alwaysApply: true
 ---
 
-# Ship bar (Cursor summary)
+# Ship bar
 
-**Authoritative copy:** repo **`WORKFLOW.md`**. Read it before shipping.
+Read the repository `WORKFLOW.md`.
 
-Every repo change: `agent/<slug>` branch → PR to `main` → CI → wait gate → feedback synthesis → thread closure → merge → **`{DEPLOY_COMMAND}`** → **`{VERIFY_COMMAND}`**.
+1. Branch from the current default branch.
+2. Commit and push only intended changes.
+3. Open a draft PR against the default branch; never stack.
+4. Require deterministic repository CI plus `bot-feedback-gate`.
+5. Treat review vendors and Qwen/local-LLM as advisory.
+6. Read all feedback, post one plan, disposition and resolve every substantive thread.
+7. Run `npm run pr:arm-and-park -- --pr <n>` once; never bypass its base guard.
+8. Deploy or restart the merged default branch.
+9. Run the repository verification command and report current evidence.
 
-## Steps (summary)
-
-1. Branch from fresh `main`.
-2. Commit and push on topic branch only.
-3. One PR to `main`; fix-ups on same branch.
-4. CI green (`gh pr checks <n> --watch`).
-5. `npm run wait-for-bots` after new PR or `--bot-tag`.
-5b. Synthesize threads → `## Feedback plan` → one push → in-thread replies.
-6. Thread closure on every substantive thread.
-7. Merge after 5–6 and `pr:bot-feedback-check` exit **0** (`npm run pr:merge` / `gh pr merge --auto --squash --delete-branch`).
-8. Run `{DEPLOY_COMMAND}` so running code matches `main`.
-9. Run `{VERIFY_COMMAND}`; exit **0**. Browser MCP for UI when needed.
-
-## Closeout
-
-```sh
-npm run ship:closeout:strict && npm run wait-for-bots
-```
-
-Do not claim "done" or "merge-ready" while an open PR exists without steps 5b–6 complete.
+Agents do not use `--watch` or sleep-poll loops.

@@ -1,14 +1,14 @@
 ---
-description: "Reply in-thread to automated reviewers before merge"
+description: "Reply in-thread to substantive automated review feedback"
 alwaysApply: true
 ---
 
-# PR review bot replies
+# PR review replies
 
-**`WORKFLOW.md`** step 6.
+External reviewers and Qwen/local-LLM are advisory, but their substantive
+feedback is not optional. Reply in-thread with `Implemented`, `Deferred`, or
+`Declined` plus evidence or rationale, then resolve the thread.
 
-For every substantive bot thread, including Qwen Code Review (`qwen-code-review` / `<!-- qwen-code-review -->`), reply in-thread before merge — `implemented in <sha>` / `deferred — <reason>` / `declined — <reason>`. Green CI alone does not replace thread closure.
-
-**Gate:** `npm run pr:bot-feedback-check -- --pr <n>` exit **0** before squash merge. CI jobs **`bot-presence-gate`** and **`pr-bot-feedback-check`** must be green when branch protection is enabled.
-
-Post-merge audit: `npm run pr:bot-feedback-audit`.
+Repository CI and `bot-feedback-gate` are required. `bot-presence-gate` is
+disabled by default. Run `npm run pr:bot-feedback-audit` for late post-merge
+feedback.

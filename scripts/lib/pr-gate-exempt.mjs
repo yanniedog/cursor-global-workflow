@@ -1,5 +1,5 @@
 /**
- * PRs that skip bot-presence-gate, bot-feedback-gate, and wait-for-bots.
+ * PRs that skip bot-feedback-gate and local settlement checks.
  * Default: generated matrix artifacts under reports/ (override via AR_PR_GATE_EXEMPT_PREFIXES).
  */
 import { isReportsOnlyFileList, isReportsOnlyPr } from './pr-reports-only.mjs';
