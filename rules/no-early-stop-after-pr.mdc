@@ -1,20 +1,18 @@
 ---
-description: "Do not stop after PR/CI green — run ship:closeout:strict; exit 2 means continue ship bar"
+description: "Do not stop after PR or CI green; use the one-shot arm-and-park classifier"
 alwaysApply: true
 ---
 
-# No early stop after PR or CI green
+# No early stop
 
-Before ending any shipping turn:
+Run:
 
 ```sh
-npm run ship:closeout:strict && npm run wait-for-bots
+npm run pr:arm-and-park -- --pr <n>
 ```
 
-- Exit **0** — guards clear.
-- `ship:closeout:strict` exit **2** — open PR; continue `WORKFLOW.md` steps 5–9.
-- `wait-for-bots` exit **2** — re-run until **0**.
+- Exit 0: gates green.
+- Exit 2: CI is settling; keep ownership without polling.
+- Exit 3: fix actionable CI, conflicts, or review threads.
 
-Never end with "done", "shipped", or "CI green so we're good" while an open PR exists and you can merge.
-
-Full ship bar: **`WORKFLOW.md`**.
+Never claim done while an owned PR still has actionable work.

@@ -1,134 +1,105 @@
 # Workflow — {PROJECT_NAME}
 
-Generic ship bar for Cursor multi-agent projects. Copy to your repo root and replace placeholders (see global `README.md`).
+Canonical PR ship bar. Repository-specific instructions may add product checks
+and deployment steps but must not weaken this policy.
 
-Single authoritative source for agents. Self-contained — critical steps are listed here in full.
+## 1. Branch from the current default branch
 
----
+Fetch first, create a distinctive topic branch, and never reuse another
+agent's in-flight branch.
 
-## Ship bar (9 steps + feedback synthesis)
+## 2. Commit and push
 
-All steps required unless the user **explicitly waives that step in writing for that PR**.
+Commit only the intended files. Push the topic branch with tracking.
 
-### 1. Branch from fresh main
+## 3. Open a draft PR against the default branch
 
-```sh
-git fetch origin && git checkout main && git pull origin main
-git checkout -b agent/<slug>   # or feat/ or fix/
-```
+Never stack a PR onto a feature branch. Required checks protect the default
+branch, so a weaker base can merge unreviewed. Several PRs may run in parallel
+against the default branch.
 
-Distinctive slug (topic + short nonce like `-kj1`). Never reuse another agent's in-flight branch.
+## 4. Required CI
 
-### 2. Commit and push
+Repository CI and `bot-feedback-gate` are merge-blocking. Use a single
+`gh pr checks <n> --required` read for diagnosis. Agents do not run `--watch`
+or sleep-poll loops.
 
-Commit only on the topic branch. `git push -u origin HEAD`.
+## 5. Advisory reviewers
 
-### 3. PR to main
+CodeRabbit, Codex, Cursor, Sourcery, Qwen/local-LLM, and other review vendors
+are advisory. Vendor quota, installation state, or an offline runner never
+controls merge liveness. `bot-presence-gate` stays disabled by default.
 
-`gh pr create --base main`. One PR per deliverable. Fix-ups stay on the same branch — do NOT open a second PR.
+`npm run wait-for-bots -- --pr <n>` therefore checks required CI settlement
+when `BOT_WAIT_REQUIRED=off`: exit 0 ready, 2 waiting, 1 hard error. An owner
+may explicitly opt a repository into reviewer presence, but generated
+repositories never do so.
 
-### 4. CI green
+## 6. Feedback synthesis and closure
 
-`gh pr checks <n> --watch` until required checks pass. Fix forward on this PR. After fix pushes, `@mention` reviewers using handles from `gh pr view -c`, and include `@qwen-review` so Qwen Code re-reviews.
-
-### 5. Bot wait trigger (dynamic)
-
-```sh
-npm run wait-for-bots
-npm run wait-for-bots -- --watch
-npm run wait-for-bots -- --bot-tag
-```
-
-Run after creating a new PR (or after tagging bots). Exit **2** = still waiting, **0** = ready, **1** = error/timeout.
-
-**Ready when** (since wait anchor — PR creation or `--bot-tag`):
-
-- Required CI checks are not pending, **and**
-- **Every required bot** has posted since the anchor (default: **gemini**, **codex**, **sourcery**, **qwen**), **and**
-- Either no bot activity for **90s** (quiet window) **or** every configured bot has posted, **and**
-- At least **60s** since anchor (unless cached ready state)
-
-**Safety cap:** **28 minutes**. Tune via env: `BOT_WAIT_POLL_SEC`, `BOT_WAIT_QUIET_SEC`, `BOT_WAIT_MIN_SEC`, `BOT_WAIT_MAX_MIN`, `BOT_WAIT_LOGINS`.
-
-**Orchestrator loop:** re-run until exit **0**. Do **not** proceed to synthesis while exit **2**.
-
-After fix pushes: `@mention` bots and include `@qwen-review`, then `npm run wait-for-bots -- --bot-tag`. Code fix pushes do **not** restart the wait anchor unless you tagged bots (`--bot-tag`).
-
-### 5b. Synthesize all feedback before responding
-
-After `wait-for-bots` exits 0, before replying to any thread:
-
-1. Fetch ALL threads (`gh pr view`, reviews API, inline comments).
-2. **Read every thread before replying to any of them.**
-3. Post ONE `## Feedback plan` on the PR: implement / defer / decline per thread.
-4. One code push, then in-thread replies.
-
-### 6. Thread closure
-
-Reply in-thread: `implemented in <sha>` / `deferred — <reason>` / `declined — <reason>`. Do NOT merge with unanswered substantive threads.
-
-**Gate:**
+Read every human and bot thread before replying. Post one `## Feedback plan`,
+make one implementation push for accepted findings, then reply in-thread with
+`Implemented`, `Deferred`, or `Declined` plus evidence or rationale. Resolve
+every substantive thread.
 
 ```sh
 npm run pr:bot-feedback-check -- --pr <n>
 ```
 
-`npm run ship:closeout:strict` runs this when an open PR exists. CI: **`pr-bot-feedback-check`** workflow.
+`bot-feedback-gate` re-evaluates review events on the PR head and remains
+required. Required conversation resolution supplies the native backstop.
 
-### 7. Merge
-
-**Default:** **`npm run pr:merge -- --pr <n>`** once steps 5–6 are done and threads are closed — runs `gh pr merge --auto --squash --delete-branch`. Auto-merge lands the PR when required checks pass. Squash is merge-time only (`gh pr create` does not set merge method). See **`templates/MERGE_POLICY.md`** (copy to `.github/MERGE_POLICY.md` in consuming repos).
-
-Merge only after steps 5–6 **and** `npm run pr:bot-feedback-check -- --pr <n>` exit **0**.
-
-### 8. Deploy / dev server confirmed
-
-Run `{DEPLOY_COMMAND}` so running code matches `main`.
-
-Examples:
-
-- Local: restart dev server, reload process manager, or `{DEPLOY_COMMAND}` from your README.
-- Remote: deploy to `{DEPLOY_URL}` if your project uses hosted acceptance.
-
-Push to `main` does not automatically update long-lived local processes — restart when needed.
-
-### 9. Verify
+## 7. Arm and park
 
 ```sh
-{VERIFY_COMMAND}
+npm run pr:arm-and-park -- --pr <n>
 ```
 
-Report exit code. For UI regressions, use **Browser MCP** (`deep-browser-explore` skill) against the acceptance URL.
+This one-shot command verifies the PR targets the default branch, syncs when
+safe, arms squash auto-merge with head-branch deletion, and classifies:
 
-If exit non-zero: fix, re-run deploy step if needed, repeat until **0**.
+- exit 0 — gates green;
+- exit 2 — CI is still settling; keep ownership without polling;
+- exit 3 — fix CI, conflicts, or review threads, push, and run it once again;
+- exit 1 — hard tooling/auth error.
 
----
+`npm run pr:merge` enforces the same default-base guard. Never route around
+the guard with a hand-written auto-merge command.
 
-## Closeout check (before claiming done on a topic branch)
+## 8. Deploy or restart
+
+Run `{DEPLOY_COMMAND}` so the active runtime matches the merged default branch.
+
+## 9. Verify
+
+Run `{VERIFY_COMMAND}` against `{DEPLOY_URL}` when applicable. Report the
+current exit code and production evidence; fix forward until it passes.
+
+## Repository settings
+
+The default branch uses strict, admin-enforced protection with deterministic
+repository CI plus `bot-feedback-gate`, pull requests, stale-review dismissal,
+and required conversation resolution. Force-push and branch deletion are
+blocked. Repositories allow squash merges only, enable auto-merge, and delete
+merged head branches.
+
+Apply or reconcile:
 
 ```sh
-npm run ship:closeout:strict && npm run wait-for-bots
+npm run repo-merge-settings:apply
+npm run branch-protection:apply
 ```
 
-- `ship:closeout:strict` exit **2** → open PR or failed bot-feedback gate; continue steps 5–9.
-- `wait-for-bots` exit **2** → bots/CI not settled; re-run until **0**.
+Qwen/local-LLM, `bot-presence-gate`, and external vendors are never required
+by the default profile.
 
----
+## Late feedback
 
-## Hard rules
-
-Urgency, "just merge", "CI green", and batch-merge phrasing **never** waive steps 5–7.
-
-Only an explicit written waiver for that specific PR waives bot closeout.
-
-## Forbidden completions
-
-While an open PR exists and you can merge: "done", "shipped", "CI green so we're good", "merge-ready", "handing off the PR" without steps 5b–6 complete.
-
-## After merge
-
-`npm run git:graph-hygiene`; delete local topic branch when safe.
+Advisory reviewers can arrive after a fast merge. Run
+`npm run pr:bot-feedback-audit` during backlog hygiene and fix every
+substantive late thread in a follow-up PR.
 
 ## Exception
 
-`main` hotfix (user must explicitly request): push directly to `main`; still do steps **8–9**.
+A direct default-branch hotfix requires an explicit user instruction for that
+specific change and does not waive deployment or verification.

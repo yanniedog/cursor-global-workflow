@@ -17,6 +17,10 @@
     "pr:merge": "node scripts/pr-merge.mjs",
     "pr:merge:verify": "node scripts/verify-pr-merge.mjs",
     "pr:gates:check": "node scripts/pr-gates-check.mjs",
+    "pr:arm-and-park": "node scripts/pr-arm-and-park.mjs",
+    "pr:arm-and-park:verify": "node scripts/verify-pr-arm-and-park.mjs",
+    "review-gates:verify": "node scripts/verify-review-gate-policy.mjs",
+    "repo:create:standard": "node scripts/create-standard-repo.mjs",
     "pr:watch-once": "node scripts/pr-watch-once.mjs",
     "pr:queue:drive": "node scripts/pr-queue-drive.mjs",
     "pr:update-branch": "node scripts/pr-update-branch.mjs"

@@ -3,7 +3,8 @@
  * Enable squash auto-merge for a PR (WORKFLOW.md step 7).
  * Syncs branch when behind, then enables gh pr merge --auto --squash --delete-branch.
  */
-import { progressPullRequest } from './lib/pr-branch-sync.mjs';
+import { fetchPrMergeMeta, progressPullRequest } from './lib/pr-branch-sync.mjs';
+import { checkDefaultBase } from './lib/pr-base-guard.mjs';
 import { mergeCommandLine, PR_MERGE_FLAGS } from './lib/pr-merge.mjs';
 import { hasGh } from './lib/gh-pr-review-threads.mjs';
 
@@ -46,6 +47,19 @@ Requires gates green (npm run pr:gates:check -- --pr <n>).`);
   if (!args.pr) {
     console.error('pr-merge: --pr <n> required');
     process.exit(1);
+  }
+
+  let meta;
+  try {
+    meta = fetchPrMergeMeta(args.pr);
+  } catch (error) {
+    console.error(`pr-merge: ${error.message}`);
+    process.exit(1);
+  }
+  const baseGuard = checkDefaultBase(meta.baseRefName);
+  if (!baseGuard.covered) {
+    console.error(`pr-merge: ${baseGuard.detail}`);
+    process.exit(3);
   }
 
   const syncBranch = !args.noSync && !args.enableOnly;

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Dynamic pre-merge bot wait gate (WORKFLOW.md step 5).
- * Exit 0 only when CI is settled, every required bot has posted since anchor,
- * and the quiet window has passed after the last bot activity.
- * Exit 2 = still waiting; exit 1 = error or required bots missing at safety cap.
+ * Dynamic pre-merge settlement gate (WORKFLOW.md step 5).
+ * Reviewers are advisory by default, so exit 0 means required CI has settled.
+ * Repositories may explicitly require reviewers, in which case their activity
+ * and the quiet window are also enforced.
+ * Exit 2 = still waiting; exit 1 = error or an explicit requirement timed out.
  */
 import { execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -240,6 +241,24 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
   const repo = repoIn || resolveRepo();
   if (!repo) return { status: 'error', message: 'Could not resolve repository (gh repo view).' };
 
+  const checks = fetchChecks(prNumber);
+  if (checks.error && !checks.pending) {
+    return { status: 'error', message: checks.error };
+  }
+  if (requiredKeys.length === 0) {
+    return checks.pending
+      ? {
+          status: 'waiting',
+          message: `PR #${prNumber}: required CI checks still pending; reviewers are advisory.`,
+        }
+      : {
+          status: 'ready',
+          message: 'Required CI checks settled; reviewers are advisory.',
+          botsSeen: [],
+          missing: [],
+        };
+  }
+
   const knownBots = allKnownBotLogins(requiredKeys);
   const elapsedMs = Date.now() - anchor.getTime();
   const maxMs = MAX_WAIT_MIN * 60 * 1000;
@@ -281,11 +300,6 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
         `Bot wait safety cap (${MAX_WAIT_MIN} min) exceeded since anchor ${anchor.toISOString()} ` +
         'without satisfying quiet window. Re-sweep manually or tag bots again.',
     };
-  }
-
-  const checks = fetchChecks(prNumber);
-  if (checks.error && !checks.pending) {
-    return { status: 'error', message: checks.error };
   }
 
   const checksReady = !checks.pending;
@@ -345,20 +359,20 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
 function printHelp(requiredKeys) {
   console.log(`Usage: npm run wait-for-bots -- [options]
 
-Poll GitHub until every required bot has posted since the wait anchor and activity is quiet.
+Check required CI. When reviewers are explicitly required, also wait for their activity.
 
 Options:
   --pr <n>              Pull request number (default: open PR for current branch)
   --watch, -w           Poll every ${POLL_INTERVAL_SEC}s until ready or cap
   --bot-tag             Reset wait anchor to now (after @mentioning bots)
   --since <iso>         Anchor wait window to timestamp (ISO 8601)
-  --require-bots <list> Comma-separated required keys (default: gemini,codex,sourcery,qwen)
+  --require-bots <list> Comma-separated required keys (default: off)
   --help, -h            Show this help
 
 Exit codes: 0 ready | 2 still waiting | 1 error or required bots missing at cap (DO NOT MERGE)
 
 Env: BOT_WAIT_POLL_SEC, BOT_WAIT_QUIET_SEC, BOT_WAIT_MIN_SEC, BOT_WAIT_MAX_MIN,
-     AR_BOT_WAIT_REQUIRED (or BOT_WAIT_REQUIRED) — comma-separated bot keys
+     AR_BOT_WAIT_REQUIRED (or BOT_WAIT_REQUIRED) — comma-separated bot keys or off
      BOT_WAIT_IGNORE_CHECK_NAMES — comma-separated gh pr checks names to ignore (CI self-gate)
 
 Required bots: ${formatRequiredKeys(requiredKeys)}
@@ -426,7 +440,9 @@ async function main() {
   }
 
   const cliOverride = args.requireBots !== null;
-  const envOverride = Boolean(process.env.AR_BOT_WAIT_REQUIRED || process.env.BOT_WAIT_REQUIRED);
+  const envOverride =
+    process.env.AR_BOT_WAIT_REQUIRED !== undefined ||
+    process.env.BOT_WAIT_REQUIRED !== undefined;
   const effectiveRequired =
     cliOverride || envOverride ? requiredKeys : state.requiredKeys || requiredKeys;
   if (
@@ -468,7 +484,7 @@ async function main() {
 
   const runOnce = () => {
     const st = readState(prNumber) || state;
-    const keys = st.requiredKeys || effectiveRequired;
+    const keys = Array.isArray(st.requiredKeys) ? st.requiredKeys : effectiveRequired;
     return evaluate({
       prNumber,
       anchorIso: st.anchor || anchorFromPr,
