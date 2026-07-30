@@ -82,6 +82,10 @@ export function progressionFailureDetail(progression) {
     || 'PR progression failed';
 }
 
+export function progressionAutoMergeSucceeded(progression) {
+  return progression?.autoMerge?.ok === true;
+}
+
 export function armAndParkOnce(prNumber, opts = {}) {
   let meta;
   try {
@@ -129,7 +133,7 @@ export function armAndParkOnce(prNumber, opts = {}) {
       ...terminal,
       progression,
       baseGuard,
-      autoMergeArmed: progression.autoMerge?.ok === true,
+      autoMergeArmed: progressionAutoMergeSucceeded(progression),
     };
   }
   if (terminal) {
@@ -192,6 +196,6 @@ export function armAndParkOnce(prNumber, opts = {}) {
     classification,
     baseGuard,
     autoMergeArmed:
-      isAutoMergeEnabled(refreshed) || progression.autoMerge?.ok === true,
+      isAutoMergeEnabled(refreshed) || progressionAutoMergeSucceeded(progression),
   };
 }
