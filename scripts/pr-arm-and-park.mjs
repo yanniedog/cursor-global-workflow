@@ -3,15 +3,30 @@ import { resolvePrNumber } from './lib/pr-gates-lib.mjs';
 import { armAndParkOnce } from './lib/pr-arm-and-park-lib.mjs';
 
 function parseArgs(argv) {
-  const out = { pr: null, json: false, dryRun: false, skipArm: false, skipSync: false };
+  const out = {
+    pr: null,
+    prError: null,
+    json: false,
+    dryRun: false,
+    skipArm: false,
+    skipSync: false,
+  };
   for (let i = 2; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') out.json = true;
     else if (arg === '--dry-run') out.dryRun = true;
     else if (arg === '--skip-arm') out.skipArm = true;
     else if (arg === '--skip-sync') out.skipSync = true;
-    else if (arg === '--pr' && argv[i + 1]) out.pr = Number(argv[++i]);
-    else if (arg.startsWith('--pr=')) out.pr = Number(arg.slice(5));
+    else if (arg === '--pr') {
+      const value = argv[++i];
+      const parsed = Number(value);
+      if (!Number.isInteger(parsed) || parsed <= 0) out.prError = 'invalid --pr (must be a positive integer)';
+      else out.pr = parsed;
+    } else if (arg.startsWith('--pr=')) {
+      const parsed = Number(arg.slice(5));
+      if (!Number.isInteger(parsed) || parsed <= 0) out.prError = 'invalid --pr (must be a positive integer)';
+      else out.pr = parsed;
+    }
     else if (arg === '--help' || arg === '-h') out.help = true;
   }
   return out;
@@ -28,6 +43,10 @@ and classify the remaining state.
 Exit 0 ready; 2 waiting on CI; 3 actionable; 1 hard error.
 Agents never use --watch or sleep-poll loops.`);
     process.exit(0);
+  }
+  if (args.prError) {
+    console.error(`pr:arm-and-park: ${args.prError}`);
+    process.exit(1);
   }
 
   let pr;

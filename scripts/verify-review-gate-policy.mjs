@@ -50,6 +50,9 @@ for (const workflow of [
   assert.match(yaml, /timeout-minutes:\s*5/);
   assert.match(yaml, /PR_STATE=\$\(gh api/);
   assert.doesNotMatch(yaml, /seq\s+1\s+40|sleep\s+60/);
+  assert.match(yaml, /types:\s*\[created, edited, deleted\]/);
+  assert.match(yaml, /for attempt in 1 2 3 4/);
+  assert.match(yaml, /sleep 5/);
 }
 
 assert.deepEqual(
@@ -97,11 +100,54 @@ assert.deepEqual(
   }).values,
   ['repo-ci', 'bot-feedback-gate'],
 );
+assert.deepEqual(
+  combineRequiredCheckState({
+    protectionOk: false,
+    rulesOk: true,
+    rules: [],
+    fallbackRequiredNames: ['repo-ci', 'bot-feedback-gate'],
+  }).values,
+  ['repo-ci', 'bot-feedback-gate'],
+);
+assert.equal(
+  evaluateRequiredCheckState({
+    requiredChecks: [{ context: 'repo-ci', appId: 100 }],
+    headCheckRuns: [{
+      id: 20,
+      name: 'repo-ci',
+      app: { id: 200 },
+      conclusion: 'success',
+      completed_at: '2026-01-01T00:00:00Z',
+    }],
+  }).pending,
+  true,
+);
+assert.equal(
+  evaluateRequiredCheckState({
+    requiredChecks: [{ context: 'repo-ci', appId: 100 }],
+    headCheckRuns: [{
+      id: 21,
+      name: 'repo-ci',
+      app: { id: 100 },
+      conclusion: 'success',
+      completed_at: '2026-01-01T00:00:00Z',
+    }],
+  }).pending,
+  false,
+);
 
 const bootstrap = read('scripts/lib/repo-bootstrap.mjs');
 assert.match(bootstrap, /pr-bot-feedback-check\.yml/);
 assert.doesNotMatch(bootstrap, /cursor-auto-pr-review\.yml/);
 assert.doesNotMatch(bootstrap, /gemini-review\.yml/);
 assert.doesNotMatch(bootstrap, /qwen-pr-review\.mjs/);
+
+const creator = read('scripts/create-standard-repo.mjs');
+assert.match(creator, /writeFileSync\(join\(target, 'WORKFLOW\.md'\)/);
+assert.match(creator, /test: 'node --test'/);
+assert.match(creator, /'--package-lock-only', '--ignore-scripts'/);
+
+const installer = read('install.sh');
+assert.match(installer, /cp -R "\$ROOT\/templates\/\." "\$TEMPLATES_DEST\/"/);
 
 console.log('review gate policy verification passed');

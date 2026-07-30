@@ -133,7 +133,8 @@ export function armAndParkOnce(prNumber, opts = {}) {
       ...terminal,
       progression,
       baseGuard,
-      autoMergeArmed: progressionAutoMergeSucceeded(progression),
+      autoMergeArmed:
+        !opts.dryRun && progressionAutoMergeSucceeded(progression),
     };
   }
   if (terminal) {
@@ -182,13 +183,23 @@ export function armAndParkOnce(prNumber, opts = {}) {
   }
 
   const gates = evaluateGates(prNumber);
-  const classification = classifyWorkMode(gates);
   let refreshed = postProgress || meta;
   try {
-    refreshed = fetchPrMergeMeta(prNumber);
+    refreshed = fetchPrMergeMeta(prNumber, { requireOpen: false });
   } catch {
     // The progression result still proves whether the arm command succeeded.
   }
+  const postGateTerminal = classifyPostProgressState(refreshed, prNumber);
+  if (postGateTerminal) {
+    return {
+      ...postGateTerminal,
+      progression,
+      gates,
+      baseGuard,
+      autoMergeArmed: false,
+    };
+  }
+  const classification = classifyWorkMode(gates);
   return {
     mode: classification.mode,
     progression,
@@ -196,6 +207,7 @@ export function armAndParkOnce(prNumber, opts = {}) {
     classification,
     baseGuard,
     autoMergeArmed:
-      isAutoMergeEnabled(refreshed) || progressionAutoMergeSucceeded(progression),
+      !opts.dryRun
+      && (isAutoMergeEnabled(refreshed) || progressionAutoMergeSucceeded(progression)),
   };
 }

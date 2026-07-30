@@ -200,12 +200,13 @@ function checkNameMatchesIgnore(checkName, ignore) {
 }
 
 function fetchChecks(prNumber) {
-  const r = spawnSync('gh', ['pr', 'checks', String(prNumber), '--json', 'name,bucket,state'], {
+  const r = spawnSync('gh', ['pr', 'checks', String(prNumber), '--required', '--json', 'name,bucket,state'], {
     encoding: 'utf8',
   });
   if (r.status === 8) return { pending: true };
   if (r.status !== 0) {
     const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
+    if (/no required checks reported|no checks reported/i.test(msg)) return { pending: false };
     return { pending: true, error: msg };
   }
   const stdout = (r.stdout || '').trim();

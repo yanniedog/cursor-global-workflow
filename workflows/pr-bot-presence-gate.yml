@@ -36,7 +36,7 @@ jobs:
       - name: Required bot wait gate
         env:
           GH_TOKEN: ${{ github.token }}
-          AR_BOT_WAIT_REQUIRED: ${{ vars.AR_BOT_WAIT_REQUIRED || 'off' }}
+          BOT_WAIT_REQUIRED: ${{ vars.BOT_WAIT_REQUIRED || 'off' }}
           BOT_WAIT_IGNORE_CHECK_NAMES: bot-presence-gate,pr-bot-feedback-check,required-bot-wait,qwen-code-review,cursor-auto-review
         run: |
           SCRIPT="${CURSOR_WORKFLOW_SCRIPTS:-./scripts}/wait_for_bots.mjs"
