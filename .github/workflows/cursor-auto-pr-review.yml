@@ -1,7 +1,7 @@
 name: qwen-code-review
 
 # pull_request_target loads this workflow from protected main. The target PR is
-# checked out separately and treated only as diff data on the self-hosted runner.
+# checked out separately and treated only as diff data on the laptop runner.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -21,9 +21,10 @@ permissions:
   checks: write
 
 concurrency:
-  group: qwen-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}-${{ github.event.pull_request.head.sha || github.event.comment.id || github.run_id }}
-  cancel-in-progress: false
-  queue: max
+  # A new push makes old analysis worthless. Cancel it before another 30B
+  # inference starts and debounce the replacement below.
+  group: qwen-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   review:
@@ -58,10 +59,10 @@ jobs:
           } else {
             $env:EVENT_PR
           }
-          $json = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$pr" | ConvertFrom-Json
-          if ($json.head.repo.full_name -ne $env:GITHUB_REPOSITORY) {
-            throw "Fork PRs cannot run on the private Qwen runner."
+          if ($pr -notmatch '^\d+$') {
+            throw "Pull request number must be numeric."
           }
+          $json = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$pr" | ConvertFrom-Json
           "number=$pr" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
           "head_sha=$($json.head.sha)" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
           "base_ref=$($json.base.ref)" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
@@ -87,9 +88,17 @@ jobs:
           $id = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA/check-runs" `
             --jq '.check_runs[] | select(.name=="qwen-code-review" and .conclusion=="success") | .id' |
             Select-Object -First 1
-          "value=$([bool]$id).ToString().ToLowerInvariant()" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $exists = [bool]$id
+          "value=$($exists.ToString().ToLowerInvariant())" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - uses: actions/checkout@v4
+      - name: Debounce rapid push sequences
+        if: >-
+          steps.exempt.outputs.value != 'true'
+          && steps.existing.outputs.value != 'true'
+          && github.event_name == 'pull_request_target'
+        run: Start-Sleep -Seconds 90
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: steps.exempt.outputs.value != 'true' && steps.existing.outputs.value != 'true'
         with:
           ref: main
@@ -97,10 +106,12 @@ jobs:
           persist-credentials: false
           clean: true
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: steps.exempt.outputs.value != 'true' && steps.existing.outputs.value != 'true'
         with:
-          ref: ${{ steps.pr.outputs.head_sha }}
+          # Base-repository pull refs expose fork heads without granting the
+          # untrusted fork repository a token or executing its code.
+          ref: refs/pull/${{ steps.pr.outputs.number }}/head
           path: review-target
           fetch-depth: 0
           persist-credentials: false
@@ -118,11 +129,12 @@ jobs:
           BASE_REF: ${{ steps.pr.outputs.base_ref }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           PROMPT_PATH: ${{ github.workspace }}\_trusted-reviewer\.cursor\PR_REVIEW_PROMPT.md
-          TRUSTED_CONTEXT_PATHS: ${{ github.workspace }}\_trusted-reviewer\AGENTS.md
+          DIFF_MAX_CHARS: "160000"
+          DIFF_CHUNK_CHARS: "24000"
         run: |
           $ErrorActionPreference = 'Continue'
           if (-not $env:QWEN_API_BASE_URL) { $env:QWEN_API_BASE_URL = 'http://127.0.0.1:11434/v1' }
-          if (-not $env:QWEN_MODEL) { $env:QWEN_MODEL = 'qwen3-coder:30b' }
+          if (-not $env:QWEN_MODEL) { $env:QWEN_MODEL = 'qwen3-coder-review:30b' }
           $out = Join-Path $env:RUNNER_TEMP 'qwen-review.md'
           $err = Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt'
           $env:OUT_FILE = $out
@@ -132,7 +144,7 @@ jobs:
           "status=$LASTEXITCODE" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
           exit 0
 
-      - name: Publish identifiable formal review
+      - name: Publish direct inline findings and revisions
         if: steps.qwen.outputs.status == '0'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -140,9 +152,25 @@ jobs:
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           MODEL: ${{ secrets.QWEN_MODEL }}
         run: |
-          $review = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'qwen-review.md')
-          $outcome = if ($review -match 'No blocking issues found\.') { 'no findings' } else { 'findings' }
-          $model = if ($env:MODEL) { $env:MODEL } else { 'qwen3-coder:30b' }
+          $review = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'qwen-review.md') | ConvertFrom-Json
+          $findings = @($review.findings)
+          $outcome = if ($findings.Count -eq 0) { 'no findings' } else { 'findings' }
+          $model = if ($env:MODEL) { $env:MODEL } else { 'qwen3-coder-review:30b' }
+          $reviewed = if (@($review.reviewed_files).Count -eq 0) {
+            '(none)'
+          } else {
+            @($review.reviewed_files) -join ', '
+          }
+          $omitted = if (@($review.omitted_files).Count -eq 0) {
+            '(none)'
+          } else {
+            @($review.omitted_files) -join ', '
+          }
+          $excluded = if (@($review.excluded_files).Count -eq 0) {
+            '(none)'
+          } else {
+            @($review.excluded_files) -join ', '
+          }
           $body = @(
             '<!-- qwen-code-review -->'
             '## Qwen Code Review'
@@ -151,13 +179,50 @@ jobs:
             "Review outcome: $outcome"
             "Model: ``$model``"
             "Workflow: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-            ''
-            $review
+            "Reviewed files: $reviewed"
+            "Omitted reviewable files: $omitted"
+            "Intentionally excluded low-signal files: $excluded"
+            if ($findings.Count -eq 0) { 'No actionable defects found in the high-signal diff.' }
+            else { "$($findings.Count) actionable inline finding(s) with direct revisions." }
           ) -join "`n"
-          $file = Join-Path $env:RUNNER_TEMP 'qwen-formal-review.md'
-          Set-Content $file $body -Encoding utf8
+          $comments = @()
+          foreach ($finding in $findings) {
+            $commentBody = @(
+              "**$($finding.severity)**"
+              ''
+              $finding.issue
+              ''
+              "**Suggested revision:** $($finding.suggested_fix)"
+            )
+            if ($finding.replacement -and $finding.side -eq 'RIGHT') {
+              $replacement = [string]$finding.replacement -replace '```', '``\`'
+              $commentBody += @('', '```suggestion', $replacement, '```')
+            }
+            $comments += @{
+              path = [string]$finding.path
+              line = [int]$finding.line
+              side = [string]$finding.side
+              body = ($commentBody -join "`n")
+            }
+          }
+          $payload = @{
+            commit_id = $env:HEAD_SHA
+            event = 'COMMENT'
+            body = $body
+            comments = $comments
+          } | ConvertTo-Json -Depth 8
+          $file = Join-Path $env:RUNNER_TEMP 'qwen-review-request.json'
+          Set-Content $file $payload -Encoding utf8
           gh api --method POST "repos/$env:GITHUB_REPOSITORY/pulls/$env:PR_NUMBER/reviews" `
-            -F commit_id="$env:HEAD_SHA" -f event=COMMENT -F body="@$file" | Out-Null
+            --input $file | Out-Null
+          @(
+            "### Qwen review coverage"
+            "- Reviewed: $(@($review.reviewed_files).Count) high-signal file(s)"
+            "- Omitted: $(@($review.omitted_files).Count) reviewable file(s)"
+            "- Intentionally excluded: $(@($review.excluded_files).Count) low-signal file(s)"
+            "- Local model calls: $($review.model_calls)"
+            "- Findings: $($findings.Count)"
+          ) -join "`n" | Add-Content $env:GITHUB_STEP_SUMMARY
 
       - name: Publish failed review notice
         if: steps.qwen.outcome != 'skipped' && steps.qwen.outputs.status != '0'
