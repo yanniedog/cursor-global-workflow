@@ -29,11 +29,17 @@ gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen3-coder:30b'
 
 ## Workflow behavior
 
+- Uses `pull_request_target` so the workflow definition, reviewer script, prompt,
+  and repository policy are loaded from protected `main`.
+- Checks out the PR head separately with no persisted credentials and treats it
+  only as diff data; PR-controlled code is never executed on the private runner.
 - Triggers on PR `opened`, `synchronize`, `reopened`, `ready_for_review`.
 - Triggers on PR comments containing `@qwen-review` (force re-review).
 - Rejects fork PRs (private laptop reviewer).
-- Posts/updates comment with `<!-- qwen-code-review -->`.
-- Check run: `qwen-code-review`.
+- Posts a new formal review for each head with `<!-- qwen-code-review -->`, the
+  exact reviewed commit, outcome, model, file coverage, and workflow URL.
+- Publishes the current-head check run `qwen-code-review`; failed reviews remain
+  failed and do not satisfy reviewer presence.
 
 ## Bot wait / tagging
 

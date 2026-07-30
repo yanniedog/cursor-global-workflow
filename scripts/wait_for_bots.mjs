@@ -123,13 +123,14 @@ function resolveRepo() {
 }
 
 function resolvePr(prArg, branch) {
+  const fields = 'number,createdAt,updatedAt,headRefName,headRefOid';
   if (prArg) {
-    const r = gh(['pr', 'view', String(prArg), '--json', 'number,createdAt,headRefName'], { json: true });
+    const r = gh(['pr', 'view', String(prArg), '--json', fields], { json: true });
     if (!r.ok) return { error: r.error };
     return { pr: r.data };
   }
   if (!branch) return { pr: null };
-  const r = gh(['pr', 'list', '--state', 'open', '--head', branch, '--json', 'number,createdAt,headRefName'], {
+  const r = gh(['pr', 'list', '--state', 'open', '--head', branch, '--json', fields], {
     json: true,
   });
   if (!r.ok) return { error: r.error };
@@ -231,7 +232,7 @@ function formatDuration(ms) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
+function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, requiredKeys }) {
   const anchor = new Date(anchorIso);
   if (!Number.isFinite(anchor.getTime())) {
     return { status: 'error', message: `Invalid anchor time: ${anchorIso}` };
@@ -252,7 +253,9 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
     (e) => isKnownBotLogin(e.login, knownBots) && new Date(e.at).getTime() >= anchorMs,
   );
   const seenLogins = [...new Set(botEventsSinceAnchor.map((e) => e.login))];
-  const missing = missingRequiredKeysFromEvents(requiredKeys, botEventsSinceAnchor);
+  const missing = missingRequiredKeysFromEvents(requiredKeys, botEventsSinceAnchor, {
+    expectedHeadSha,
+  });
   const allRequiredPosted =
     requiredKeys.length > 0 && botEventsSinceAnchor.length > 0 && missing.length === 0;
   const lastBotAt =
@@ -396,6 +399,7 @@ async function main() {
   }
 
   const prNumber = resolved.pr.number;
+  const headSha = resolved.pr.headRefOid;
   const repo = resolveRepo();
   if (!repo) {
     console.error('>>> BOT WAIT ERROR: Could not resolve repository (gh repo view).');
@@ -403,6 +407,7 @@ async function main() {
   }
   let state = readState(prNumber) || {};
   const anchorFromPr = resolved.pr.createdAt;
+  const anchorFromHead = resolved.pr.updatedAt || anchorFromPr;
 
   if (args.botTag) {
     const anchorIso = new Date().toISOString();
@@ -416,8 +421,15 @@ async function main() {
     state.readyAt = null;
     state.requiredKeys = requiredKeys;
     writeState(prNumber, state);
+  } else if (state.headSha !== headSha) {
+    state.anchor = anchorFromHead;
+    state.readyAt = null;
+    state.headSha = headSha;
+    state.requiredKeys = requiredKeys;
+    writeState(prNumber, state);
   } else if (!state.anchor || new Date(state.anchor) < new Date(anchorFromPr)) {
     state.anchor = anchorFromPr;
+    state.headSha = headSha;
     state.requiredKeys = requiredKeys;
     writeState(prNumber, state);
   } else if (!state.requiredKeys) {
@@ -472,6 +484,7 @@ async function main() {
     return evaluate({
       prNumber,
       anchorIso: st.anchor || anchorFromPr,
+      expectedHeadSha: headSha,
       state: st,
       repo,
       requiredKeys: keys,

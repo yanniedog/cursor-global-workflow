@@ -1,7 +1,9 @@
-name: cursor-auto-pr-review
+name: qwen-code-review
 
+# pull_request_target loads this workflow from protected main. The target PR is
+# checked out separately and treated only as diff data on the laptop runner.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
   issue_comment:
     types: [created]
@@ -19,12 +21,13 @@ permissions:
   checks: write
 
 concurrency:
-  group: qwen-code-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}-${{ github.event.pull_request.head.sha || github.run_id }}
-  cancel-in-progress: true
+  group: qwen-review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || github.run_id }}-${{ github.event.pull_request.head.sha || github.event.comment.id || github.run_id }}
+  cancel-in-progress: false
+  queue: max
 
 jobs:
-  qwen-code-review:
-    name: qwen-code-review
+  review:
+    name: qwen-review-runner
     if: >-
       github.event_name == 'workflow_dispatch'
       || github.event.pull_request != null
@@ -32,134 +35,81 @@ jobs:
           && github.event.issue.pull_request
           && github.event.comment.user.type != 'Bot'
           && contains(github.event.comment.body, '@qwen-review'))
-    # Local Ollama on this machine (same pattern as simjury pr-local-llm-review).
     runs-on: [self-hosted, Windows, X64, qwen-local-llm]
     timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
     steps:
-      - name: Reject untrusted fork execution
-        if: github.event_name == 'pull_request' || github.event_name == 'issue_comment'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          BASE_REPO: ${{ github.repository }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if ($env:EVENT_NAME -eq 'issue_comment') {
-            $head = gh api "repos/$env:BASE_REPO/pulls/$env:ISSUE_NUMBER" --jq .head.repo.full_name
-          } else {
-            $head = $env:HEAD_REPO
-          }
-          if ($head -ne $env:BASE_REPO) {
-            throw "Fork PRs cannot run on the private laptop reviewer. head=$head base=$($env:BASE_REPO)"
-          }
-
-      - name: Resolve pull request metadata
+      - name: Resolve and trust-check pull request
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_PR: ${{ github.event.pull_request.number }}
-          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          EVENT_BASE_REF: ${{ github.event.pull_request.base.ref }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           INPUT_PR: ${{ inputs.pr_number }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $force = 'false'
-          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
-            $pr = $env:INPUT_PR
-            $json = gh pr view $pr --json headRefOid,baseRefName | ConvertFrom-Json
-            $head = $json.headRefOid
-            $base = $json.baseRefName
-            $force = 'true'
+          $pr = if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+            $env:INPUT_PR
           } elseif ($env:EVENT_NAME -eq 'issue_comment') {
-            $pr = $env:ISSUE_NUMBER
-            $json = gh pr view $pr --json headRefOid,baseRefName | ConvertFrom-Json
-            $head = $json.headRefOid
-            $base = $json.baseRefName
-            $force = 'true'
+            $env:ISSUE_NUMBER
           } else {
-            $pr = $env:EVENT_PR
-            $head = $env:EVENT_HEAD_SHA
-            $base = $env:EVENT_BASE_REF
+            $env:EVENT_PR
           }
-          "number=$pr" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "head_sha=$head" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "base_ref=$base" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "force_rerun=$force" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $json = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$pr" | ConvertFrom-Json
+          if ($json.head.repo.full_name -ne $env:GITHUB_REPOSITORY) {
+            throw "Fork PRs cannot run on the private Qwen runner."
+          }
+          "number=$pr" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "head_sha=$($json.head.sha)" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "base_ref=$($json.base.ref)" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "author=$($json.user.login)" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "author_type=$($json.user.type)" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Gate exempt check
-        id: gate_exempt
-        if: github.event_name == 'pull_request'
+      - name: Determine exemption
+        id: exempt
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          AUTHOR: ${{ steps.pr.outputs.author }}
+          AUTHOR_TYPE: ${{ steps.pr.outputs.author_type }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          if ($env:PR_AUTHOR_TYPE -eq 'Bot' -or $env:PR_AUTHOR -like '*[bot]') {
-            "exempt=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            "reason=bot-authored" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
-          if ($env:PR_TITLE -match '^chore(\((deps|deps-dev|ci|bot|release)\)|:\s*(deps|dependabot|renovate|bot\b))') {
-            "exempt=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            "reason=chore" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          } else {
-            "exempt=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          }
+          $isBot = $env:AUTHOR_TYPE -eq 'Bot' -or $env:AUTHOR.EndsWith('[bot]')
+          "value=$($isBot.ToString().ToLowerInvariant())" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Skip if already reviewed for this commit
-        id: already
-        if: >-
-          steps.gate_exempt.outputs.exempt != 'true'
-          && steps.pr.outputs.force_rerun != 'true'
+      - name: Check existing current-head result
+        id: existing
+        if: steps.exempt.outputs.value != 'true' && github.event_name != 'workflow_dispatch' && github.event_name != 'issue_comment'
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $existing = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA/check-runs" --paginate `
+          $id = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA/check-runs" `
             --jq '.check_runs[] | select(.name=="qwen-code-review" and .conclusion=="success") | .id' |
             Select-Object -First 1
-          if ($existing) {
-            "skip=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          } else {
-            "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          }
-
-      - name: Gate exempt or already reviewed — pass
-        if: steps.gate_exempt.outputs.exempt == 'true' || steps.already.outputs.skip == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-          REASON: ${{ steps.gate_exempt.outputs.reason || 'already-reviewed' }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          gh api --method POST "repos/$env:GITHUB_REPOSITORY/check-runs" `
-            --field name="qwen-code-review" `
-            --field head_sha="$env:HEAD_SHA" `
-            --field status="completed" `
-            --field conclusion="success" `
-            --field "output[title]=Qwen Code Review" `
-            --field "output[summary]=Skipped ($env:REASON)." | Out-Null
-          Write-Host "qwen-code-review: skipped ($env:REASON)"
+          "value=$([bool]$id).ToString().ToLowerInvariant()" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - uses: actions/checkout@v4
-        if: steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
+        if: steps.exempt.outputs.value != 'true' && steps.existing.outputs.value != 'true'
         with:
-          ref: ${{ steps.pr.outputs.head_sha }}
-          fetch-depth: 0
+          ref: main
+          path: _trusted-reviewer
+          persist-credentials: false
           clean: true
 
-      - name: Run Qwen Code review
-        id: review
-        if: steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
+      - uses: actions/checkout@v4
+        if: steps.exempt.outputs.value != 'true' && steps.existing.outputs.value != 'true'
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          path: review-target
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Run trusted Qwen reviewer
+        id: qwen
+        if: steps.exempt.outputs.value != 'true' && steps.existing.outputs.value != 'true'
+        working-directory: review-target
         env:
           QWEN_API_BASE_URL: ${{ secrets.QWEN_API_BASE_URL }}
           QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
@@ -167,89 +117,92 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           BASE_REF: ${{ steps.pr.outputs.base_ref }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PROMPT_PATH: ${{ github.workspace }}\_trusted-reviewer\.cursor\PR_REVIEW_PROMPT.md
+          TRUSTED_CONTEXT_PATHS: ${{ github.workspace }}\_trusted-reviewer\AGENTS.md
         run: |
-          $ErrorActionPreference = 'Stop'
+          $ErrorActionPreference = 'Continue'
           if (-not $env:QWEN_API_BASE_URL) { $env:QWEN_API_BASE_URL = 'http://127.0.0.1:11434/v1' }
           if (-not $env:QWEN_MODEL) { $env:QWEN_MODEL = 'qwen3-coder:30b' }
-          $outFile = Join-Path $env:RUNNER_TEMP 'qwen-review.txt'
-          $errFile = Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt'
-          $env:OUT_FILE = $outFile
-          $script = 'scripts/qwen-pr-review.mjs'
-          if (-not (Test-Path $script)) {
-            'Missing scripts/qwen-pr-review.mjs in the repository checkout.' | Set-Content -Path $errFile
-            "status=1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
-          Get-Process ollama -ErrorAction SilentlyContinue | ForEach-Object { $_.PriorityClass = 'BelowNormal' }
-          $stdout = Join-Path $env:RUNNER_TEMP 'qwen-review-stdout.txt'
-          $p = Start-Process -FilePath node -ArgumentList $script -NoNewWindow -Wait -PassThru `
-            -RedirectStandardOutput $stdout -RedirectStandardError $errFile
-          if ($p.ExitCode -ne 0) {
-            "status=$($p.ExitCode)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
-          if (-not (Test-Path $outFile) -or ((Get-Item $outFile).Length -eq 0)) {
-            if ((Test-Path $stdout) -and ((Get-Item $stdout).Length -gt 0)) {
-              Copy-Item $stdout $outFile -Force
-            }
-          }
-          if (-not (Test-Path $outFile) -or ((Get-Item $outFile).Length -eq 0)) {
-            'Qwen review completed without producing review output.' | Set-Content -Path $errFile
-            "status=1" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
-          "status=0" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          $out = Join-Path $env:RUNNER_TEMP 'qwen-review.md'
+          $err = Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt'
+          $env:OUT_FILE = $out
+          Get-Process ollama -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.PriorityClass = 'BelowNormal' }
+          & node "$env:GITHUB_WORKSPACE\_trusted-reviewer\scripts\qwen-pr-review.mjs" 2> $err
+          "status=$LASTEXITCODE" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          exit 0
 
-      - name: Post or update PR review comment
-        if: always() && steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
+      - name: Publish identifiable formal review
+        if: steps.qwen.outputs.status == '0'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
-          REVIEW_STATUS: ${{ steps.review.outputs.status }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          MODEL: ${{ secrets.QWEN_MODEL }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $outFile = Join-Path $env:RUNNER_TEMP 'qwen-review.txt'
-          $errFile = Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt'
-          $comment = Join-Path $env:RUNNER_TEMP 'qwen-review-comment.md'
-          $lines = @('<!-- qwen-code-review -->', '## Qwen Code Review', '')
-          if ($env:REVIEW_STATUS -eq '0') {
-            $lines += Get-Content -Raw $outFile
-          } else {
-            $lines += 'Qwen Code review did not complete successfully.'
-            $lines += ''
-            $lines += '```text'
-            if (Test-Path $errFile) { $lines += (Get-Content -Raw $errFile).TrimEnd() }
-            $lines += '```'
-          }
-          Set-Content -Path $comment -Value ($lines -join "`n") -Encoding utf8
-          $commentId = gh api "repos/$env:GITHUB_REPOSITORY/issues/$env:PR_NUMBER/comments" --paginate `
-            --jq '.[] | select((.body | contains("<!-- qwen-code-review -->")) or (.body | contains("<!-- cursor-auto-review -->"))) | .id' |
-            Select-Object -Last 1
-          if ($commentId) {
-            gh api --method PATCH "repos/$env:GITHUB_REPOSITORY/issues/comments/$commentId" --field body="@$comment" | Out-Null
-          } else {
-            gh pr comment $env:PR_NUMBER --body-file $comment
-          }
+          $review = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'qwen-review.md')
+          $outcome = if ($review -match 'No blocking issues found\.') { 'no findings' } else { 'findings' }
+          $model = if ($env:MODEL) { $env:MODEL } else { 'qwen3-coder:30b' }
+          $body = @(
+            '<!-- qwen-code-review -->'
+            '## Qwen Code Review'
+            ''
+            "Reviewed commit: ``$env:HEAD_SHA``"
+            "Review outcome: $outcome"
+            "Model: ``$model``"
+            "Workflow: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            ''
+            $review
+          ) -join "`n"
+          $file = Join-Path $env:RUNNER_TEMP 'qwen-formal-review.md'
+          Set-Content $file $body -Encoding utf8
+          gh api --method POST "repos/$env:GITHUB_REPOSITORY/pulls/$env:PR_NUMBER/reviews" `
+            -F commit_id="$env:HEAD_SHA" -f event=COMMENT -F body="@$file" | Out-Null
 
-      - name: Publish qwen-code-review check
-        if: always() && steps.gate_exempt.outputs.exempt != 'true' && steps.already.outputs.skip != 'true'
+      - name: Publish failed review notice
+        if: steps.qwen.outcome != 'skipped' && steps.qwen.outputs.status != '0'
         env:
           GH_TOKEN: ${{ github.token }}
-          REVIEW_STATUS: ${{ steps.review.outputs.status }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          $ErrorActionPreference = 'Stop'
+          $errorText = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt')
+          $body = @(
+            '<!-- qwen-code-review -->'
+            '## Qwen Code Review'
+            ''
+            "Reviewed commit: ``$env:HEAD_SHA``"
+            'Review outcome: failed'
+            ''
+            'Qwen Code Review did not complete successfully. This does not satisfy reviewer presence.'
+            ''
+            '```text'
+            $errorText.Trim()
+            '```'
+          ) -join "`n"
+          gh pr comment $env:PR_NUMBER --body $body
+
+      - name: Publish current-head qwen-code-review check
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          EXEMPT: ${{ steps.exempt.outputs.value }}
+          EXISTING: ${{ steps.existing.outputs.value }}
+          STATUS: ${{ steps.qwen.outputs.status }}
+        run: |
           $conclusion = 'success'
-          $summary = 'Qwen Code review completed and posted a PR comment.'
-          if ($env:REVIEW_STATUS -ne '0') {
+          $summary = 'Qwen review completed for this head commit.'
+          if ($env:EXEMPT -eq 'true') {
+            $summary = 'Skipped for bot-authored pull request.'
+          } elseif ($env:EXISTING -eq 'true') {
+            $summary = 'A successful Qwen review already exists for this head commit.'
+          } elseif ($env:STATUS -ne '0') {
             $conclusion = 'failure'
-            $summary = 'Qwen Code review failed. See the PR comment and workflow logs.'
+            $summary = 'Qwen review failed. See the workflow log and PR notice.'
           }
           gh api --method POST "repos/$env:GITHUB_REPOSITORY/check-runs" `
-            --field name="qwen-code-review" `
-            --field head_sha="$env:HEAD_SHA" `
-            --field status="completed" `
-            --field conclusion="$conclusion" `
-            --field "output[title]=Qwen Code Review" `
-            --field "output[summary]=$summary" | Out-Null
+            -f name='qwen-code-review' -f head_sha="$env:HEAD_SHA" `
+            -f status='completed' -f conclusion="$conclusion" `
+            -f 'output[title]=Qwen Code Review' -f "output[summary]=$summary" | Out-Null
           if ($conclusion -ne 'success') { exit 1 }
