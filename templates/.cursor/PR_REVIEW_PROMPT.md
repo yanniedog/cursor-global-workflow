@@ -1,58 +1,31 @@
-# Qwen Code PR Review
+# Qwen direct finding review
 
-You are reviewing a pull request in CI using Qwen 3 Coder. This is a review-only task.
+Find only concrete defects introduced by the supplied pull-request diff. Prioritize
+correctness, security, data integrity, races, error handling, compatibility, and
+CI/release breakage.
 
-## Ground Rules
+Do not summarize the pull request, files, or scripts. Do not write a walkthrough,
+praise, generic advice, or a test-gap section. Spend tokens only on a reachable defect
+and a direct revision.
 
-- Do not edit files.
-- Do not commit, push, create branches, or open pull requests.
-- Do not post GitHub comments yourself; CI will publish your final response.
-- Base conclusions only on repository files and the pull request diff.
-- Prefer concrete findings over general style advice.
+Return strict JSON only:
 
-## Context To Read
-
-Before reviewing, read the repo guidance when present:
-
-- `AGENTS.md`
-- `CLAUDE.md`
-- `WORKFLOW.md`
-- `.cursor/rules/**/*.mdc`
-- `.cursor/PR_REVIEW_PROMPT.md`
-
-Review the pull request diff from the base branch to `HEAD`. Use the provided diff and reason about surrounding risk for any changed lines that look risky.
-
-## Review Focus
-
-Prioritize issues that could cause real regressions:
-
-- Correctness bugs, missed edge cases, race conditions, state bugs, and broken invariants.
-- Security, data exposure, permission, injection, path traversal, and secret-handling issues.
-- Integration problems across scripts, workflows, functions, processes, classes, and downstream dependencies.
-- CI/CD, release, deployment, build, and test failures introduced by the PR.
-- Missing tests only when the changed behavior is non-trivial or high risk.
-
-Avoid blocking on harmless style preferences, speculative concerns, or broad refactors outside the PR scope.
-
-## Output Format
-
-Return markdown only:
-
-```markdown
-## Summary
-One short paragraph explaining what changed and the overall risk.
-
-## Findings
-- Severity: High|Medium|Low
-  Location: path:line
-  Issue: Clear explanation of the bug or risk.
-  Suggested fix: Specific fix direction.
-
-If there are no findings, write:
-No blocking issues found.
-
-## Test Gaps
-Mention important missing verification, or write "No major test gaps identified."
+```json
+{
+  "findings": [
+    {
+      "severity": "High|Medium|Low",
+      "path": "exact/repository/path.ts",
+      "line": 123,
+      "side": "RIGHT|LEFT",
+      "issue": "Reachable execution path and concrete impact.",
+      "suggested_fix": "A precise code revision.",
+      "replacement": "Optional exact replacement, without Markdown fences."
+    }
+  ]
+}
 ```
 
-Keep findings concise and actionable. Include file paths and line numbers whenever possible.
+`line` must be a changed line on the stated side of the diff. Use `RIGHT` for
+added/replaced lines and `LEFT` for deleted lines. Return an empty findings array
+when there is no concrete defect. Maximum eight distinct findings.

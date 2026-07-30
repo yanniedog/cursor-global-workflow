@@ -9,7 +9,7 @@ import {
 } from './bot-wait-config.mjs';
 
 const COMMENTS_QUERY =
-  'query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){createdAt comments(last:100){nodes{author{login}createdAt body}}reviews(last:30){nodes{author{login}submittedAt body}}reviewThreads(last:100){nodes{comments(last:10){nodes{author{login}createdAt body}}}}}}}';
+  'query($owner:String!,$name:String!,$num:Int!){repository(owner:$owner,name:$name){pullRequest(number:$num){createdAt headRefOid comments(last:100){nodes{author{login}createdAt body}}reviews(last:30){nodes{author{login}submittedAt body}}reviewThreads(last:100){nodes{comments(last:10){nodes{author{login}createdAt body}}}}}}}';
 
 function ghGraphql(owner, name, prNumber) {
   const r = spawnSync(
@@ -73,7 +73,9 @@ export function checkRequiredBotsOnPr(owner, name, prNumber, { requiredKeys, anc
   const anchor = anchorIso || pr.createdAt;
   const events = collectBotEvents(pr, knownBots, anchor);
   const seenLogins = [...new Set(events.map((e) => e.login))];
-  const missing = missingRequiredKeysFromEvents(keys, events);
+  const missing = missingRequiredKeysFromEvents(keys, events, {
+    expectedHeadSha: pr.headRefOid,
+  });
   return {
     requiredKeys: keys,
     anchor,

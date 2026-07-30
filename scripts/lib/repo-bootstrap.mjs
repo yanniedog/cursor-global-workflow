@@ -194,6 +194,8 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
   const cursorCliConfigTemplate = join(templatesDir, '.cursor', 'cli.json');
   const qwenReviewScriptTemplate = join(templatesDir, 'scripts', 'qwen-pr-review.mjs');
   const qwenReviewScriptFromRoot = join(scriptsRoot, 'qwen-pr-review.mjs');
+  const qwenReviewModelTemplate = join(templatesDir, 'scripts', 'qwen-review.Modelfile');
+  const qwenReviewModelFromRoot = join(scriptsRoot, 'qwen-review.Modelfile');
   const ruleDest = join(rulesDir, '00-use-global-workflow.mdc');
   const workflowDest = join(workspaceRoot, 'WORKFLOW.md');
   const cursorReviewWorkflowDest = join(
@@ -211,6 +213,7 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
   const cursorReviewPromptDest = join(cursorDir, 'PR_REVIEW_PROMPT.md');
   const cursorCliConfigDest = join(cursorDir, 'cli.json');
   const qwenReviewScriptDest = join(workspaceRoot, 'scripts', 'qwen-pr-review.mjs');
+  const qwenReviewModelDest = join(workspaceRoot, 'scripts', 'qwen-review.Modelfile');
 
   if (dryRun) {
     result.bootstrapped = true;
@@ -280,6 +283,13 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
   copyTemplateIfMissing(qwenSrc, qwenReviewScriptDest, 'scripts/qwen-pr-review.mjs', result);
   if (markerVersion !== null) {
     copyTemplateAlways(qwenSrc, qwenReviewScriptDest, 'scripts/qwen-pr-review.mjs', result);
+  }
+  const qwenModelSrc = existsSync(qwenReviewModelTemplate)
+    ? qwenReviewModelTemplate
+    : qwenReviewModelFromRoot;
+  copyTemplateIfMissing(qwenModelSrc, qwenReviewModelDest, 'scripts/qwen-review.Modelfile', result);
+  if (markerVersion !== null) {
+    copyTemplateAlways(qwenModelSrc, qwenReviewModelDest, 'scripts/qwen-review.Modelfile', result);
   }
 
   const pkgPath = join(workspaceRoot, 'package.json');

@@ -2,7 +2,7 @@
 param(
     [string]$BaseUrl = $(if ($env:QWEN_API_BASE_URL) { $env:QWEN_API_BASE_URL } else { 'http://127.0.0.1:11434/v1' }),
     [string]$ApiKey = $env:QWEN_API_KEY,
-    [string]$Model = $(if ($env:QWEN_MODEL) { $env:QWEN_MODEL } else { 'qwen3-coder:30b' }),
+    [string]$Model = $(if ($env:QWEN_MODEL) { $env:QWEN_MODEL } else { 'qwen2.5-coder-review:7b' }),
     [string]$CodeRoot = (Join-Path $env:USERPROFILE 'code'),
     [switch]$PushRepos,
     [switch]$WhatIf
@@ -16,6 +16,20 @@ if (-not $BaseUrl) {
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw 'gh CLI is required (gh auth login).'
+}
+
+if ($Model -eq 'qwen2.5-coder-review:7b' -and (Get-Command ollama -ErrorAction SilentlyContinue)) {
+    ollama show $Model *> $null
+    if ($LASTEXITCODE -ne 0) {
+        $modelFile = Join-Path $PSScriptRoot 'qwen-review.Modelfile'
+        if (-not (Test-Path -LiteralPath $modelFile)) {
+            throw "Missing Qwen review Modelfile: $modelFile"
+        }
+        ollama create $Model -f $modelFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create Ollama model $Model"
+        }
+    }
 }
 
 $repos = @()
