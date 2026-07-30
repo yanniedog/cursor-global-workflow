@@ -189,6 +189,7 @@ export function gateCiRequired(prNumber) {
       detail: ci.missing
         ? 'Required checks have not reported on the current head yet'
         : 'Required checks still pending',
+      pending: true,
       action: 'CI is pending; park without polling and re-run pr:arm-and-park on wake',
     };
   }

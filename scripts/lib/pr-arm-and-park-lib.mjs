@@ -18,7 +18,7 @@ export function classifyGateFailure(gate) {
   if (!gate || gate.pass) return 'ok';
   if (ALWAYS_ACTIONABLE.has(gate.id)) return 'actionable';
   if (gate.id === 'ci-required') {
-    return /pending/i.test(gate.detail || '') ? 'waiting' : 'actionable';
+    return gate.pending || /pending/i.test(gate.detail || '') ? 'waiting' : 'actionable';
   }
   if (gate.id === 'github-bot-gates') {
     return /not reported yet|pending|in_progress|queued/i.test(gate.detail || '')
@@ -75,6 +75,13 @@ export function classifyPostProgressState(meta, prNumber) {
   };
 }
 
+export function progressionFailureDetail(progression) {
+  return progression?.ready?.detail
+    || progression?.sync?.detail
+    || progression?.branchState?.detail
+    || 'PR progression failed';
+}
+
 export function armAndParkOnce(prNumber, opts = {}) {
   let meta;
   try {
@@ -97,27 +104,17 @@ export function armAndParkOnce(prNumber, opts = {}) {
     };
   }
 
-  const progression = progressPullRequest(prNumber, {
-    dryRun: Boolean(opts.dryRun),
-    syncBranch: !opts.skipSync,
-    enableAuto: !opts.skipArm,
-  });
-  if (progression.blocked) {
-    return {
-      mode: 'actionable',
-      progression,
-      baseGuard,
-      autoMergeArmed: false,
-      classification: {
-        mode: 'actionable',
-        actionable: [{
-          id: 'branch-fresh',
-          pass: false,
-          detail: progression.sync?.detail || progression.branchState?.detail,
-        }],
-        waiting: [],
-      },
-    };
+  let progression = null;
+  let progressionError = null;
+  try {
+    progression = progressPullRequest(prNumber, {
+      dryRun: Boolean(opts.dryRun),
+      syncBranch: !opts.skipSync,
+      enableAuto: !opts.skipArm,
+      markReady: true,
+    });
+  } catch (error) {
+    progressionError = error;
   }
 
   let postProgress = null;
@@ -141,6 +138,42 @@ export function armAndParkOnce(prNumber, opts = {}) {
       progression,
       baseGuard,
       autoMergeArmed: false,
+    };
+  }
+  if (progressionError) {
+    return {
+      mode: 'error',
+      error: progressionError.message,
+      progression,
+      baseGuard,
+      autoMergeArmed: false,
+    };
+  }
+  if (progression?.blocked) {
+    const detail = progressionFailureDetail(progression);
+    if (progression.hardError) {
+      return {
+        mode: 'error',
+        error: detail,
+        progression,
+        baseGuard,
+        autoMergeArmed: false,
+      };
+    }
+    return {
+      mode: 'actionable',
+      progression,
+      baseGuard,
+      autoMergeArmed: false,
+      classification: {
+        mode: 'actionable',
+        actionable: [{
+          id: 'branch-fresh',
+          pass: false,
+          detail,
+        }],
+        waiting: [],
+      },
     };
   }
 

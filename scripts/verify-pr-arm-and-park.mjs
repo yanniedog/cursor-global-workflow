@@ -4,6 +4,7 @@ import {
   classifyGateFailure,
   classifyPostProgressState,
   classifyWorkMode,
+  progressionFailureDetail,
 } from './lib/pr-arm-and-park-lib.mjs';
 import { shouldMarkReady } from './lib/pr-branch-sync.mjs';
 import { evaluateDefaultBase } from './lib/pr-base-guard.mjs';
@@ -17,6 +18,15 @@ assert.equal(evaluateDefaultBase('feature/base', 'main').covered, false);
 assert.equal(evaluateDefaultBase('main', null).covered, false);
 assert.equal(
   classifyGateFailure({ id: 'ci-required', pass: false, detail: 'pending' }),
+  'waiting',
+);
+assert.equal(
+  classifyGateFailure({
+    id: 'ci-required',
+    pass: false,
+    pending: true,
+    detail: 'Required checks have not reported on the current head yet',
+  }),
   'waiting',
 );
 assert.equal(
@@ -58,9 +68,17 @@ assert.equal(
   'actionable',
 );
 assert.equal(classifyPostProgressState({ state: 'OPEN' }, 7), null);
-assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: true }), true);
-assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: false }), false);
-assert.equal(shouldMarkReady({ state: 'MERGED', isDraft: true }), false);
+assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: true }), false);
+assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: true }, true), true);
+assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: false }, true), false);
+assert.equal(shouldMarkReady({ state: 'MERGED', isDraft: true }, true), false);
+assert.equal(
+  progressionFailureDetail({
+    ready: { detail: 'gh pr ready failed: auth denied' },
+    sync: null,
+  }),
+  'gh pr ready failed: auth denied',
+);
 assert.match(
   fetchRequiredCi.toString(),
   /missing:\s*true/,
