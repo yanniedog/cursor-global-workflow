@@ -150,4 +150,8 @@ assert.match(creator, /'--package-lock-only', '--ignore-scripts'/);
 const installer = read('install.sh');
 assert.match(installer, /cp -R "\$ROOT\/templates\/\." "\$TEMPLATES_DEST\/"/);
 
+const waiter = read('scripts/wait_for_bots.mjs');
+assert.match(waiter, /git', \['rev-parse', '--git-path', relative\]/);
+assert.match(waiter, /--required/);
+
 console.log('review gate policy verification passed');
