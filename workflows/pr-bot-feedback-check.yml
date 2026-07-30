@@ -22,10 +22,11 @@ permissions:
   pull-requests: read
 
 concurrency:
-  # A newer head or review event supersedes the old 40-minute check. Grouping
-  # by PR prevents stale heads from occupying runners and starving current CI.
+  # Grouping by PR prevents every pushed head from occupying its own runner.
+  # Keep one running check plus GitHub's single coalesced pending run: cancelling
+  # event bursts can leave CANCELLED selected as the required head context.
   group: bot-feedback-gate-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   bot-feedback-gate:
