@@ -7,7 +7,11 @@ import { ghJson } from './gh-pr-review-threads.mjs';
 
 const GH_TIMEOUT_MS = 120_000;
 const PR_VIEW_FIELDS =
-  'number,state,headRefName,baseRefName,mergeable,mergeStateStatus,autoMergeRequest';
+  'number,state,isDraft,headRefName,baseRefName,mergeable,mergeStateStatus,autoMergeRequest';
+
+export function shouldMarkReady(meta) {
+  return meta?.state === 'OPEN' && Boolean(meta.isDraft);
+}
 
 export function classifyBranchState(meta) {
   const ms = meta?.mergeStateStatus || 'UNKNOWN';
@@ -80,6 +84,31 @@ function ghUpdateBranch(prNumber, { dryRun = false } = {}) {
     ok: r.status === 0,
     stdout: (r.stdout || '').trim(),
     stderr: (r.stderr || '').trim(),
+    exitCode: r.status ?? 1,
+  };
+}
+
+export function markPrReady(prNumber, { dryRun = false } = {}) {
+  const args = ['pr', 'ready', String(prNumber)];
+  if (dryRun) {
+    return { ok: true, action: 'skipped', detail: `gh ${args.join(' ')}`, exitCode: 0 };
+  }
+  const r = spawnSync('gh', args, { encoding: 'utf8', timeout: GH_TIMEOUT_MS });
+  if (r.error?.code === 'ETIMEDOUT') {
+    return {
+      ok: false,
+      action: 'failed',
+      detail: `gh timed out after ${GH_TIMEOUT_MS}ms`,
+      exitCode: 1,
+    };
+  }
+  if (r.error) {
+    return { ok: false, action: 'failed', detail: r.error.message, exitCode: 1 };
+  }
+  return {
+    ok: r.status === 0,
+    action: r.status === 0 ? 'ready' : 'failed',
+    detail: (r.stderr || r.stdout || (r.status === 0 ? 'PR marked ready' : 'gh pr ready failed')).trim(),
     exitCode: r.status ?? 1,
   };
 }
@@ -166,11 +195,32 @@ export function enableSquashAutoMerge(prNumber, { dryRun = false } = {}) {
 }
 
 export function progressPullRequest(prNumber, { dryRun = false, syncBranch = true, enableAuto = true } = {}) {
-  const meta = fetchPrMergeMeta(prNumber);
+  let meta = fetchPrMergeMeta(prNumber);
+  const ready = shouldMarkReady(meta) ? markPrReady(prNumber, { dryRun }) : {
+    ok: true,
+    action: 'skipped',
+    detail: 'PR already ready for review',
+    exitCode: 0,
+  };
+  if (!ready.ok) {
+    return {
+      prNumber,
+      headRefName: meta.headRefName,
+      ready,
+      sync: null,
+      autoMerge: null,
+      blocked: true,
+      ok: false,
+    };
+  }
+  if (ready.action === 'ready') {
+    meta = fetchPrMergeMeta(prNumber);
+  }
   const state = classifyBranchState(meta);
   const out = {
     prNumber,
     headRefName: meta.headRefName,
+    ready,
     branchState: state,
     sync: null,
     autoMerge: null,

@@ -5,6 +5,7 @@ import {
   classifyPostProgressState,
   classifyWorkMode,
 } from './lib/pr-arm-and-park-lib.mjs';
+import { shouldMarkReady } from './lib/pr-branch-sync.mjs';
 import { evaluateDefaultBase } from './lib/pr-base-guard.mjs';
 
 assert.equal(evaluateDefaultBase('main', 'main').covered, true);
@@ -38,6 +39,9 @@ assert.equal(
   'actionable',
 );
 assert.equal(classifyPostProgressState({ state: 'OPEN' }, 7), null);
+assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: true }), true);
+assert.equal(shouldMarkReady({ state: 'OPEN', isDraft: false }), false);
+assert.equal(shouldMarkReady({ state: 'MERGED', isDraft: true }), false);
 assert.deepEqual(
   classifyPostProgressState({ state: 'MERGED' }, 7),
   {
