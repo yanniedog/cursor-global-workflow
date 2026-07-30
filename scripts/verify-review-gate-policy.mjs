@@ -149,6 +149,8 @@ const creator = read('scripts/create-standard-repo.mjs');
 assert.match(creator, /writeFileSync\(join\(target, 'WORKFLOW\.md'\)/);
 assert.match(creator, /test: 'node --test'/);
 assert.match(creator, /'--package-lock-only', '--ignore-scripts'/);
+assert.match(creator, /process\.env\.ComSpec \|\| 'cmd\.exe'/);
+assert.match(creator, /\['\/d', '\/s', '\/c', 'npm', \.\.\.args\]/);
 
 const installer = read('install.sh');
 assert.match(installer, /cp -R "\$ROOT\/templates\/\." "\$TEMPLATES_DEST\/"/);
