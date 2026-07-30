@@ -21,12 +21,6 @@ permissions:
   contents: read
   pull-requests: read
 
-concurrency:
-  # Single-shot checks finish quickly, so keep every same-head result. GitHub
-  # blocks when any duplicate required check is CANCELLED, even if a sibling passed.
-  group: bot-feedback-gate-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
-  cancel-in-progress: false
-
 jobs:
   bot-feedback-gate:
     if: >-

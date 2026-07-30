@@ -43,8 +43,7 @@ for (const workflow of [
   assert.match(yaml, /^\s{2}bot-feedback-gate:/m);
   assert.doesNotMatch(yaml, /^\s{2}pr-bot-feedback-check:/m);
   assert.match(yaml, /persist-credentials: false/);
-  assert.match(yaml, /group:\s*bot-feedback-gate-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*inputs\.pr_number\s*\|\|\s*github\.run_id\s*\}\}/);
-  assert.match(yaml, /cancel-in-progress:\s*false/);
+  assert.doesNotMatch(yaml, /^concurrency:/m);
   assert.doesNotMatch(yaml, /pull_request\.head\.sha/);
   assert.doesNotMatch(yaml, /queue:\s*max/);
   assert.match(yaml, /timeout-minutes:\s*5/);
