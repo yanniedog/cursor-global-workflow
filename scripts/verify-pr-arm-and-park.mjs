@@ -4,6 +4,7 @@ import {
   classifyGateFailure,
   classifyPostProgressState,
   classifyWorkMode,
+  progressionAutoMergeSucceeded,
   progressionFailureDetail,
 } from './lib/pr-arm-and-park-lib.mjs';
 import { shouldMarkReady } from './lib/pr-branch-sync.mjs';
@@ -79,6 +80,8 @@ assert.equal(
   }),
   'gh pr ready failed: auth denied',
 );
+assert.equal(progressionAutoMergeSucceeded(null), false);
+assert.equal(progressionAutoMergeSucceeded({ autoMerge: { ok: true } }), true);
 assert.match(
   fetchRequiredCi.toString(),
   /fetchRequiredCheckState/,
