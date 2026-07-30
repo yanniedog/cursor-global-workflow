@@ -1,0 +1,69 @@
+name: pr-bot-feedback-check
+
+# Vendor-neutral thread-closure gate. Reviewer presence is deliberately not a
+# merge dependency; substantive feedback that exists must still be dispositioned
+# and resolved.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: bot-feedback-gate-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  bot-feedback-gate:
+    if: >-
+      github.event.pull_request != null
+      || github.event.review != null
+      || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+      - name: Review thread closure gate
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GATE_TOKEN || github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+        run: |
+          SCRIPT="${CURSOR_WORKFLOW_SCRIPTS:-./scripts}/pr-bot-feedback-check.mjs"
+          case "$EVENT_NAME" in
+            workflow_dispatch) PR="$INPUT_PR" ;;
+            *)                 PR="$EVENT_PR" ;;
+          esac
+          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::Pull request number must be numeric"; exit 1; }
+          for attempt in $(seq 1 40); do
+            set +e
+            node "$SCRIPT" --pr "$PR" --skip-bot-presence
+            code=$?
+            set -e
+            if [ "$code" -eq 0 ]; then
+              exit 0
+            fi
+            echo "Review feedback is still open (attempt $attempt/40); keeping the required check pending."
+            sleep 60
+          done
+          echo "::error::Substantive review feedback remained open for 40 minutes."
+          exit 1

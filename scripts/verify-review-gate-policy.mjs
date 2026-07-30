@@ -31,6 +31,7 @@ for (const retired of ['bot-presence-gate', 'qwen-code-review', 'local-llm-revie
 }
 
 for (const workflow of [
+  '.github/workflows/pr-bot-feedback-check.yml',
   'workflows/pr-bot-feedback-check.yml',
   'templates/.github/workflows/pr-bot-feedback-check.yml',
 ]) {
