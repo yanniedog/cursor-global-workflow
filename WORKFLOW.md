@@ -37,10 +37,13 @@ repositories never do so.
 
 ## 6. Feedback synthesis and closure
 
+**babysit skill etc must always address PR bot feedback where appropriate.**
+
 Read every human and bot thread before replying. Post one `## Feedback plan`,
 make one implementation push for accepted findings, then reply in-thread with
 `Implemented`, `Deferred`, or `Declined` plus evidence or rationale. Resolve
-every substantive thread.
+every substantive thread. Advisory reviewers still require that disposition;
+green CI does not replace it.
 
 ```sh
 npm run pr:bot-feedback-check -- --pr <n>
