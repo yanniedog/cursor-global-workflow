@@ -21,12 +21,17 @@ threads because CI is green or reviewers are labeled advisory.
 
 ## Per finding
 
-1. Enumerate distinct threads (merge duplicates into one reply).
+1. Enumerate every review thread. Group duplicate findings in the Feedback plan
+   only; still reply and resolve each affected thread (the gate is per-thread).
 2. Judge: implement / defer / decline (with reason).
-3. Reply in-thread on GitHub, or `## Feedback responses` on the PR.
+3. Reply in-thread on GitHub with `implemented` / `deferred` / `declined`.
+   If the inline reply API is unavailable, add `## Feedback responses` on the
+   PR **and** still resolve every affected thread after naming it.
 4. Resolve the thread after the disposition reply.
 5. Re-check after later pushes for new bot threads before merge.
 
-Do not merge with unaddressed substantive threads. Low-signal noise (quota
-notices, empty “react with thumbs” prompts) may be left alone only when the
-feedback gate classifies them as non-blocking.
+Do not merge with unresolved review threads. Low-signal noise (quota notices,
+empty “react with thumbs” prompts) may omit a disposition reply only after the
+thread is resolved; unresolved low-signal threads still fail `bot-feedback-gate`.
+Duplicate threads already answered on the same finding still need resolve (and
+a closure reply when the gate requires one for that thread).

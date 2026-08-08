@@ -27,14 +27,14 @@ Green CI alone is never enough. Do not enable auto-merge and walk away while sub
 
 ## What is “appropriate”
 
-| Handle (required disposition) | May leave alone |
-|-------------------------------|-----------------|
-| Inline file comments proposing a code/doc/test change | Pure walkthrough / summary-only bot posts |
-| P1/P2 / “actionable” / “potential issue” findings | Quota / rate-limit / “react with thumbs” noise when the feedback gate classifies them non-blocking |
-| CI failures tied to the PR head | Duplicate threads already answered on the same finding |
+| Handle (required disposition + resolve) | Resolve without disposition text |
+|-----------------------------------------|----------------------------------|
+| Inline file comments proposing a code/doc/test change | Pure walkthrough / summary-only bot posts (still resolve) |
+| P1/P2 / “actionable” / “potential issue” findings | Quota / rate-limit / “react with thumbs” noise — omit disposition reply only after resolve; unresolved still fails the gate |
+| CI failures tied to the PR head | Duplicate threads already answered on the same finding — still resolve each thread (and reply if that thread lacks a closure) |
 | Human review requests | |
 
-When unsure, disposition the thread (`declined — <reason>` is valid) rather than ignoring it.
+When unsure, disposition the thread (`declined — <reason>` is valid) rather than ignoring it. Do not leave duplicates or low-signal threads unresolved unless the feedback gate explicitly implements a skip for that class.
 
 ## Loop
 
@@ -58,7 +58,5 @@ After later pushes, re-scan for **new** bot threads and repeat disposition befor
 
 ## Related
 
-- `skills/pr-fix-agent/SKILL.md` — full ship-bar owner for one PR
-- `rules/respond-to-each-review-comment.mdc`
-- `rules/pr-review-bot-replies.mdc`
-- `WORKFLOW.md` step 6
+- Shared contract: `WORKFLOW.md` step 6, `rules/respond-to-each-review-comment.mdc`, `rules/pr-review-bot-replies.mdc`
+- Peer role (by name only): pr-fix-agent — full ship-bar owner for one PR
