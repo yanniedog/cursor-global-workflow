@@ -5,9 +5,12 @@ alwaysApply: true
 
 # PR review replies
 
-External reviewers and Qwen/local-LLM are advisory, but their substantive
-feedback is not optional. Reply in-thread with `Implemented`, `Deferred`, or
-`Declined` plus evidence or rationale, then resolve the thread.
+**babysit skill etc must always address PR bot feedback where appropriate.**
+
+External reviewers and Qwen/local-LLM are advisory for merge *liveness*
+(vendor quota must not block the ship bar), but their substantive feedback is
+still mandatory to disposition. Reply in-thread with `Implemented`,
+`Deferred`, or `Declined` plus evidence or rationale, then resolve the thread.
 
 Repository CI and `bot-feedback-gate` are required. `bot-presence-gate` is
 disabled by default. Run `npm run pr:bot-feedback-audit` for late post-merge

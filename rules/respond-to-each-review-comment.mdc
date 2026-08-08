@@ -7,16 +7,26 @@ alwaysApply: true
 
 **`WORKFLOW.md`** step 6.
 
+**babysit skill etc must always address PR bot feedback where appropriate.**
+
+Babysit, pr-fix, chief, and orchestrator workers do not skip substantive bot
+threads because CI is green or reviewers are labeled advisory.
+
 ## What counts
 
 - CI failures (tests, lint).
 - Human inline comments and reviews.
-- Bots: Gemini, Codex, Qwen Code Review, Copilot, CodeRabbit, Sourcery, Greptile, security scanners.
+- Bots: Gemini, Codex, Qwen Code Review, Copilot, CodeRabbit, Sourcery, Greptile,
+  Cursor Auto Review, security scanners, and similar.
 
 ## Per finding
 
 1. Enumerate distinct threads (merge duplicates into one reply).
 2. Judge: implement / defer / decline (with reason).
 3. Reply in-thread on GitHub, or `## Feedback responses` on the PR.
+4. Resolve the thread after the disposition reply.
+5. Re-check after later pushes for new bot threads before merge.
 
-Do not merge with unaddressed substantive threads.
+Do not merge with unaddressed substantive threads. Low-signal noise (quota
+notices, empty “react with thumbs” prompts) may be left alone only when the
+feedback gate classifies them as non-blocking.

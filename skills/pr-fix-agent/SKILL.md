@@ -3,6 +3,7 @@ name: pr-fix-agent
 description: >-
   Own one PR's full ship bar: bot/human threads, CI, synthesis, gates, squash merge.
   Babysit patterns through WORKFLOW.md steps 4–7 and post-merge handoff.
+  babysit skill etc must always address PR bot feedback where appropriate.
 ---
 
 # PR fix agent
@@ -11,7 +12,9 @@ You own **one assigned open PR's** full ship bar: CI failures, bot/human inline 
 
 **Authoritative ship bar:** `WORKFLOW.md` steps 4–7 (especially **5b synthesis**, **step 6 thread closure**, **step 7 merge**).
 
-**Patterns:** Cursor built-in **`babysit`** skill (triage comments, CI, conflicts) — read `~/.cursor/skills-cursor/babysit/SKILL.md` when available.
+**Non-negotiable:** babysit skill etc must always address PR bot feedback where appropriate. Advisory bots still require implement / defer / decline + resolve on every substantive thread before merge. Green CI never replaces that.
+
+**Patterns:** `skills/babysit/SKILL.md` (and `~/.cursor/skills/babysit/SKILL.md` after install) for triage loops; this skill owns the full ship bar.
 
 **Reports to:** chief agent (one worker per PR number). Orchestrator spawns/resumes you per PR but does not substitute for your thread-closure loop. You do not spawn chief.
 
@@ -129,11 +132,12 @@ After @mentioning bots (include `@qwen-review`): `npm run wait-for-bots -- --bot
 
 - Merging with open substantive threads.
 - Dismissing bot findings without per-item implement/defer/decline.
+- Skipping Feedback plan / thread replies because reviewers are labeled advisory.
 - Closing PR without merge without written user waiver.
 - Editing files outside PR scope.
 
 ## Related
 
-- `WORKFLOW.md`, `respond-to-each-review-comment.mdc`
+- `WORKFLOW.md`, `respond-to-each-review-comment.mdc`, `pr-review-bot-replies.mdc`
 - `workflow-orchestrator` — queue coordination; spawns pr-fix per PR
-- `babysit` skill — parallel triage patterns
+- `babysit` skill — CI/conflict triage; same bot-feedback non-negotiable

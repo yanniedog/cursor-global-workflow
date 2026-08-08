@@ -9,6 +9,8 @@ description: >-
 
 You are the **chief coordination authority** for the current repository session. You sit **above** the workflow orchestrator (`~/.cursor/skills/workflow-orchestrator/SKILL.md` or `.cursor/skills/workflow-orchestrator/SKILL.md`). You own **multi-agent coordination** — who works on what, when, and with which locks. You **do not** run ship bar yourself; spawn **one dedicated pr-fix/babysit worker per open PR** for bot feedback, thread closure, and merge. Delegate **workflow-orchestrator** only for queue coordination (split PRs, path routing, ordering) — not as a single worker for all PR threads.
 
+**babysit skill etc must always address PR bot feedback where appropriate.** Chief must not mark a cycle complete while an owned PR has substantive bot threads without an active pr-fix/babysit worker dispositioning them.
+
 **One chief per session.** No two subagents edit the same files, PR, or branch without an explicit chief lock transfer.
 
 ## Non-negotiable operating principles

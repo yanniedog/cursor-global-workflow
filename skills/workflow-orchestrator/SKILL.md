@@ -158,6 +158,6 @@ Return: branch name, PR URL, CI status, ship bar step reached, blockers.
 ## Related files
 
 - Chief: `~/.cursor/skills/chief-agent/SKILL.md`
-- Babysit: Cursor built-in `babysit/SKILL.md`
+- Babysit: `skills/babysit/SKILL.md` — babysit skill etc must always address PR bot feedback where appropriate
 - Ship bar: repo `WORKFLOW.md`
 - Rules: `~/.cursor/rules/git-pr-workflow-default.mdc`
