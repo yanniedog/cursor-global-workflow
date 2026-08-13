@@ -85,3 +85,16 @@ Copy `templates/project.json.example` → `YOUR_REPO/.cursor/project.json`:
 ## Ship bar
 
 Copy `WORKFLOW.md` template to repo root; fill `{PROJECT_NAME}`, `{VERIFY_COMMAND}`, `{DEPLOY_COMMAND}`, `{DEPLOY_URL}`.
+
+## Cursor Cloud specific instructions
+
+This repo is a dependency-free Node.js ESM CLI toolkit — there is no bundled app, build step, or test/lint framework. `package.json` declares **no dependencies**, so `npm install` is a no-op (prints "up to date", creates no `node_modules`). Requires Node 18+ and an authenticated `gh` CLI (both preinstalled in Cloud).
+
+- **Run the tools** via the `npm run` scripts in `package.json` (`chief:scan`, `agent:auditor`, `pr:gates:check`, `pr:bot-feedback-check`, `ship:closeout:strict`, etc.). Each script targets the current git repo (cwd = repo root) and shells out to `git` + `gh`.
+- **Lint substitute** (no linter configured): `for f in scripts/*.mjs scripts/lib/*.mjs; do node --check "$f"; done` to syntax-check every script.
+- **Quick smoke test:** `npm run chief:scan` (git+gh repo-health report) and `npm run agent:auditor` (audit report) should both exit 0 on a clean checkout.
+- **Non-obvious gotchas:**
+  - Several scripts poll or block by design: `wait-for-bots`, `pr:gates:check --watch`, `pr:queue:drive`, `ship:closeout:strict`. A **non-zero exit is often intentional** (a merge gate failing), not an environment error.
+  - Most PR-oriented scripts only do meaningful work when there are open PRs / a real consumer-repo context; against a clean repo with no PRs they report "none" and exit 0.
+  - Scripts write artifacts under the target repo's `.git/` (e.g. `.git/auditor/`, `.git/cursor-bot-wait/`), so they never dirty the tracked working tree.
+  - `.ps1` scripts are Windows-only; use the `.mjs`/`.sh` equivalents on Linux.
