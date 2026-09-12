@@ -85,3 +85,12 @@ Copy `templates/project.json.example` → `YOUR_REPO/.cursor/project.json`:
 ## Ship bar
 
 Copy `WORKFLOW.md` template to repo root; fill `{PROJECT_NAME}`, `{VERIFY_COMMAND}`, `{DEPLOY_COMMAND}`, `{DEPLOY_URL}`.
+
+## Cursor Cloud specific instructions
+
+This repository contains Node.js ESM command-line tools and portable Cloud setup scripts. It declares no npm dependencies; use the checked-in Node scripts directly. An authenticated `gh` CLI is needed for live GitHub operations. Do not assume authentication is preconfigured.
+
+- Syntax check: `find scripts -name '*.mjs' -exec node --check {} \;`.
+- Deterministic verification: `npm run pr:merge:verify`, `npm run pr:arm-and-park:verify`, and `npm run review-gates:verify`.
+- Live audit commands can return nonzero for real pending or failing merge gates. Follow `WORKFLOW.md` and use one-shot checks; do not start polling loops.
+- For Linux setup and maintenance, follow `codex-cloud/README.md`. Windows PowerShell scripts require Windows; use the documented portable equivalents in Cloud.
