@@ -73,8 +73,8 @@ export function isTrivialBotMessage(bodyRaw) {
   // anything substantive remains â€” bodies whose ONLY content is the footer get
   // dropped, but a real review with a footer tacked on stays.
   const withoutFooter = body.replace(/Useful\?\s*React with[\s\S]*$/i, '').trim();
-  if (withoutFooter.length < 40) return true;
-  return TRIVIAL_PATTERNS.some((re) => re.test(body));
+  if (!withoutFooter) return true;
+  return TRIVIAL_PATTERNS.some((re) => re.test(withoutFooter));
 }
 
 /**

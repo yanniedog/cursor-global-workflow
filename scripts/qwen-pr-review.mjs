@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Ask local Qwen once for actionable, line-addressable findings. Protected
+ * Ask local Qwen once per diff chunk for actionable, line-addressable findings. Protected
  * reviewer code supplies the prompt; PR content is read only as git diff data.
  */
 import { spawnSync } from 'node:child_process';
@@ -39,10 +39,10 @@ export function isReviewablePath(filePath) {
   const path = String(filePath || '').replace(/\\/g, '/');
   if (
     /(^|\/)(node_modules|dist|build|coverage|reports|assets)\//i.test(path) ||
-    /(?:package-lock\.json|changelog\/|\.snap$)/i.test(path)
+    /(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock|poetry\.lock|uv\.lock|changelog\/|\.snap$)/i.test(path)
   ) return false;
   return (
-    /\.(?:[cm]?[jt]sx?|json|ya?ml|gradle|properties|xml|kt|java|sh|ps1)$/i.test(path) ||
+    /\.(?:[cm]?[jt]sx?|json|ya?ml|gradle|properties|xml|kt|java|sh|ps1|py|go|rs|c|cc|cpp|h|hpp|swift|tf|sql|rb|php|vue|svelte|css|html)$/i.test(path) ||
     /(^|\/)(?:Dockerfile|Podfile|[^/]+\.Modelfile)$/i.test(path)
   );
 }
@@ -68,7 +68,7 @@ export function changedLinesFromDiff(diffText) {
       newLine = Number(hunk[2]);
       continue;
     }
-    if (oldLine == null || newLine == null || text.startsWith('---') || text.startsWith('+++')) {
+    if (oldLine == null || newLine == null || text.startsWith('\\ No newline')) {
       continue;
     }
     if (text.startsWith('+')) {
@@ -77,7 +77,7 @@ export function changedLinesFromDiff(diffText) {
     } else if (text.startsWith('-')) {
       left.add(oldLine);
       oldLine += 1;
-    } else {
+    } else if (text.startsWith(' ')) {
       oldLine += 1;
       newLine += 1;
     }
@@ -143,16 +143,17 @@ function parseModelJson(raw) {
   const cleaned = String(raw || '').trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '');
+  let parsed;
   try {
-    const parsed = JSON.parse(cleaned);
-    if (!Array.isArray(parsed?.findings)) fail('Qwen response has no findings array');
-    return parsed;
+    parsed = JSON.parse(cleaned);
   } catch (error) {
     fail(`Qwen returned invalid findings JSON: ${error.message}; ${cleaned.slice(0, 600)}`);
   }
+  if (!Array.isArray(parsed?.findings)) fail('Qwen response has no findings array');
+  return parsed;
 }
 
-function normalizeFindings(rawFindings, diff) {
+export function normalizeFindings(rawFindings, diff) {
   const findings = [];
   for (const raw of rawFindings) {
     const path = String(raw?.path || '').replace(/\\/g, '/').trim();
@@ -167,8 +168,8 @@ function normalizeFindings(rawFindings, diff) {
       !/^(LEFT|RIGHT)$/.test(side) ||
       !diff.validLines.get(path)?.[side.toLowerCase()]?.has(line) ||
       !/^(high|medium|low)$/i.test(severity) ||
-      issue.length < 20 ||
-      suggestedFix.length < 10
+      issue.length === 0 ||
+      suggestedFix.length === 0
     ) continue;
     findings.push({
       severity: severity[0].toUpperCase() + severity.slice(1).toLowerCase(),
@@ -203,7 +204,7 @@ async function requestFindings({ baseUrl, apiKey, model, userContent }) {
       keep_alive: '30m',
       options: {
         temperature: 0,
-        num_predict: 250,
+        num_predict: 2048,
         num_ctx: contextTokens,
       },
       messages: [

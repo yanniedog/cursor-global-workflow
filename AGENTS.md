@@ -51,6 +51,7 @@ Installed to `~/.cursor/workflow-scripts/`; env `CURSOR_WORKFLOW_SCRIPTS` points
 | `chief:scan` | `chief-scan.mjs` |
 | `pr:bot-feedback-check` | `pr-bot-feedback-check.mjs` |
 | `pr:gates:check` | `pr-gates-check.mjs` |
+| `pr:arm-and-park` | `pr-arm-and-park.mjs` |
 | `pr:watch-once` | `pr-watch-once.mjs` |
 | `pr:queue:drive` | `pr-queue-drive.mjs` |
 | `pr:update-branch` | `pr-update-branch.mjs` |
@@ -58,7 +59,11 @@ Installed to `~/.cursor/workflow-scripts/`; env `CURSOR_WORKFLOW_SCRIPTS` points
 | `ship:closeout:strict` | `ship-closeout-strict.mjs` |
 | `agent:auditor` | `agent-auditor-scan.mjs` |
 
-PR review (Qwen): `scripts/qwen-pr-review.mjs` + `.github/workflows/cursor-auto-pr-review.yml`. Setup: [`docs/QWEN_PR_REVIEW_SETUP.md`](docs/QWEN_PR_REVIEW_SETUP.md). Tag re-review with `@qwen-review` then `npm run wait-for-bots -- --bot-tag`.
+Review vendors and Qwen/local-LLM are advisory. New repositories are created
+with `npm run repo:create:standard`; this installs deterministic CI plus the
+required feedback gate and applies GitHub protection/merge settings. Do not
+bootstrap Qwen or `bot-presence-gate` as required checks. The legacy Qwen setup
+guide is retained only for an explicit owner opt-in.
 
 Wire these in each repo's `package.json` (see README tier 2).
 

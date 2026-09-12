@@ -20,7 +20,9 @@ export const BOT_ALIASES = {
   cursor: ['github-actions[bot]'],
 };
 
-export const DEFAULT_REQUIRED_KEYS = ['gemini', 'codex', 'sourcery', 'qwen'];
+// Review vendors are advisory. Merge liveness must not depend on a local
+// runner, vendor quota, or an installation outside the repository's control.
+export const DEFAULT_REQUIRED_KEYS = [];
 
 export const OPTIONAL_BOT_LOGINS = [
   'github-actions[bot]',
@@ -90,6 +92,7 @@ export function missingRequiredKeysFromEvents(requiredKeys, events, opts = {}) {
 
 export function parseRequiredKeys(raw) {
   if (!raw || !String(raw).trim()) return [...DEFAULT_REQUIRED_KEYS];
+  if (/^(off|none|disabled)$/i.test(String(raw).trim())) return [];
   return String(raw)
     .split(',')
     .map((s) => s.trim().toLowerCase())
@@ -97,7 +100,9 @@ export function parseRequiredKeys(raw) {
 }
 
 export function resolveRequiredKeys(argvKeys, envRaw) {
-  if (argvKeys?.length) return argvKeys;
+  // An explicitly supplied empty list means "off"; do not resurrect a saved
+  // or environment policy.
+  if (Array.isArray(argvKeys)) return argvKeys;
   const fromEnv = envRaw ?? process.env.AR_BOT_WAIT_REQUIRED ?? process.env.BOT_WAIT_REQUIRED ?? '';
   return parseRequiredKeys(fromEnv);
 }
@@ -132,5 +137,6 @@ export function missingRequiredKeys(requiredKeys, seenLogins) {
 }
 
 export function formatRequiredKeys(keys) {
+  if (!keys.length) return 'none (reviewers advisory)';
   return keys.map((k) => `${k} (${loginsForKey(k).join(' | ')})`).join(', ');
 }

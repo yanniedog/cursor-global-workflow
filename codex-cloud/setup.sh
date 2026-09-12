@@ -11,8 +11,15 @@ mapfile -t dependency_dirs < <(codex_cloud_dependency_dirs "$repo_root")
 if [[ "${#dependency_dirs[@]}" -eq 0 ]]; then
   echo "codex-cloud: no supported lockfiles found; no dependency setup required"
   marker="$(codex_cloud_marker)"
+  current_fingerprint="$(codex_cloud_lock_hash "$repo_root")"
+  previous_fingerprint="$(cat "$marker" 2>/dev/null || true)"
+  if [[ -n "$previous_fingerprint" && "$previous_fingerprint" != v2:0:* ]]; then
+    rm -f -- "$marker"
+    echo "codex-cloud: lockfiles were removed from a cached environment; start a fresh environment before verification" >&2
+    exit 1
+  fi
   mkdir -p "$(dirname "$marker")"
-  codex_cloud_lock_hash "$repo_root" > "$marker"
+  printf '%s\n' "$current_fingerprint" > "$marker"
   echo "codex-cloud: dependency setup complete"
   exit 0
 fi
@@ -28,11 +35,21 @@ for dependency_dir in "${dependency_dirs[@]}"; do
     codex_cloud_require_command npm "the npm lockfile in $relative_dir"
     npm ci --no-audit --no-fund
   elif [[ -f pnpm-lock.yaml ]]; then
-    if ! command -v pnpm >/dev/null 2>&1 && command -v corepack >/dev/null 2>&1; then
-      corepack enable
+    package_manager=""
+    if [[ -f package.json ]]; then
+      codex_cloud_require_command node "package.json in $relative_dir"
+      package_manager="$(node -p "require('./package.json').packageManager || ''")"
     fi
-    codex_cloud_require_command pnpm "pnpm-lock.yaml in $relative_dir"
-    pnpm install --frozen-lockfile
+    if [[ "$package_manager" == pnpm@* ]]; then
+      codex_cloud_require_command corepack "the pinned pnpm version in $relative_dir"
+      corepack pnpm install --frozen-lockfile
+    else
+      if ! command -v pnpm >/dev/null 2>&1 && command -v corepack >/dev/null 2>&1; then
+        corepack enable
+      fi
+      codex_cloud_require_command pnpm "pnpm-lock.yaml in $relative_dir"
+      pnpm install --frozen-lockfile
+    fi
   elif [[ -f yarn.lock ]]; then
     if ! command -v yarn >/dev/null 2>&1 && command -v corepack >/dev/null 2>&1; then
       corepack enable
@@ -68,8 +85,8 @@ for dependency_dir in "${dependency_dirs[@]}"; do
     done
   fi
 
-  if [[ -f go.sum ]]; then
-    codex_cloud_require_command go "go.sum in $relative_dir"
+  if [[ -f go.mod ]]; then
+    codex_cloud_require_command go "go.mod in $relative_dir"
     go mod download
   fi
   if [[ -f Cargo.lock ]]; then
@@ -78,15 +95,20 @@ for dependency_dir in "${dependency_dirs[@]}"; do
   fi
   if [[ -f Gemfile.lock ]]; then
     codex_cloud_require_command bundle "Gemfile.lock in $relative_dir"
-    bundle install
+    BUNDLE_FROZEN=true bundle install
   fi
   if [[ -f composer.lock ]]; then
     codex_cloud_require_command composer "composer.lock in $relative_dir"
     composer install --no-interaction --prefer-dist
   fi
   if [[ -f pubspec.lock ]]; then
-    codex_cloud_require_command flutter "pubspec.lock in $relative_dir"
-    flutter pub get
+    if grep -Eq '^[[:space:]]*sdk:[[:space:]]*flutter([[:space:]#]|$)' pubspec.yaml; then
+      codex_cloud_require_command flutter "Flutter pubspec.lock in $relative_dir"
+      flutter pub get
+    else
+      codex_cloud_require_command dart "Dart pubspec.lock in $relative_dir"
+      dart pub get
+    fi
   fi
 
   popd >/dev/null

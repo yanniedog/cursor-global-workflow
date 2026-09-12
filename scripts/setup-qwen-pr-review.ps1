@@ -25,9 +25,13 @@ if ($Model -eq 'qwen2.5-coder-review:7b' -and (Get-Command ollama -ErrorAction S
         if (-not (Test-Path -LiteralPath $modelFile)) {
             throw "Missing Qwen review Modelfile: $modelFile"
         }
+        if ($WhatIf) {
+            Write-Host "[what-if] ollama create $Model -f $modelFile"
+        } else {
         ollama create $Model -f $modelFile
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to create Ollama model $Model"
+        }
         }
     }
 }
@@ -71,6 +75,6 @@ Write-Host "Secrets set on $set repos (model=$Model)."
 Write-Host 'Ensure the base URL is reachable from GitHub-hosted runners (or use a self-hosted runner).'
 Write-Host 'Open a PR (or comment @qwen-review) to trigger cursor-auto-pr-review / qwen-code-review.'
 
-if ($PushRepos) {
+if ($PushRepos -and -not $WhatIf) {
     & (Join-Path $PSScriptRoot 'bootstrap-all-repos.ps1') -CodeRoot $CodeRoot -Commit -Push
 }

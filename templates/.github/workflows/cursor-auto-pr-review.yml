@@ -29,6 +29,7 @@ concurrency:
       || (github.event_name == 'issue_comment'
           && github.event.issue.pull_request
           && github.event.comment.user.type != 'Bot'
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
           && contains(github.event.comment.body, '@qwen-review')
           && github.event.issue.number)
       || inputs.pr_number
@@ -45,6 +46,7 @@ jobs:
       || (github.event_name == 'issue_comment'
           && github.event.issue.pull_request
           && github.event.comment.user.type != 'Bot'
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
           && contains(github.event.comment.body, '@qwen-review'))
     runs-on: [self-hosted, Windows, X64, qwen-local-llm]
     timeout-minutes: 45
@@ -111,7 +113,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: steps.exempt.outputs.value != 'true' && steps.existing.outputs.value != 'true'
         with:
-          ref: main
+          ref: ${{ github.event.repository.default_branch }}
           path: _trusted-reviewer
           persist-credentials: false
           clean: true
@@ -205,14 +207,15 @@ jobs:
           $comments = @()
           foreach ($finding in $findings) {
             $commentBody = @(
+              '<!-- qwen-code-review -->'
               "**$($finding.severity)**"
               ''
               $finding.issue
               ''
               "**Suggested revision:** $($finding.suggested_fix)"
             )
-            if ($finding.replacement -and $finding.side -eq 'RIGHT') {
-              $replacement = [string]$finding.replacement -replace '```', '``\`'
+            if ($finding.replacement -and $finding.side -eq 'RIGHT' -and -not ([string]$finding.replacement).Contains('```')) {
+              $replacement = [string]$finding.replacement
               $commentBody += @('', '```suggestion', $replacement, '```')
             }
             $comments += @{
@@ -248,7 +251,9 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          $errorText = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt')
+          $errorPath = Join-Path $env:RUNNER_TEMP 'qwen-review-error.txt'
+          $errorText = if (Test-Path $errorPath) { [string](Get-Content -Raw $errorPath) } else { '' }
+          if (-not $errorText.Trim()) { $errorText = 'Reviewer failed without diagnostic output.' }
           $body = @(
             '<!-- qwen-code-review -->'
             '## Qwen Code Review'
@@ -262,7 +267,7 @@ jobs:
             $errorText.Trim()
             '```'
           ) -join "`n"
-          gh pr comment $env:PR_NUMBER --body $body
+          gh pr comment $env:PR_NUMBER --repo $env:GITHUB_REPOSITORY --body $body
 
       - name: Publish current-head qwen-code-review check
         if: always()
@@ -274,6 +279,7 @@ jobs:
           STATUS: ${{ steps.qwen.outputs.status }}
           PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:HEAD_SHA)) { exit 0 }
           $conclusion = 'success'
           $summary = 'Qwen review completed for this head commit.'
           if ($env:EXEMPT -eq 'true') {

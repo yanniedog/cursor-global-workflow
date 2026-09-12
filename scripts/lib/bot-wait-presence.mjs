@@ -1,3 +1,4 @@
+import { fetchReviewHistory } from './pr-review-history.mjs';
 import { spawnSync } from 'node:child_process';
 import {
   allKnownBotLogins,
@@ -70,6 +71,7 @@ export function checkRequiredBotsOnPr(owner, name, prNumber, { requiredKeys, anc
   const data = ghGraphql(owner, name, prNumber);
   const pr = data?.data?.repository?.pullRequest;
   if (!pr) throw new Error('GraphQL: pull request not found');
+  pr.reviews = { nodes: fetchReviewHistory(owner, name, prNumber) };
   const anchor = anchorIso || pr.createdAt;
   const events = collectBotEvents(pr, knownBots, anchor);
   const seenLogins = [...new Set(events.map((e) => e.login))];
