@@ -90,7 +90,8 @@ Copy `WORKFLOW.md` template to repo root; fill `{PROJECT_NAME}`, `{VERIFY_COMMAN
 
 This repository contains Node.js ESM command-line tools and portable Cloud setup scripts. It declares no npm dependencies; use the checked-in Node scripts directly. An authenticated `gh` CLI is needed for live GitHub operations. Do not assume authentication is preconfigured.
 
-- Syntax check: `find scripts -name '*.mjs' -exec node --check {} \;`.
+- Syntax check: `node scripts/verify-syntax.mjs`.
 - Deterministic verification: `npm run pr:merge:verify`, `npm run pr:arm-and-park:verify`, and `npm run review-gates:verify`.
 - Live audit commands can return nonzero for real pending or failing merge gates. Follow `WORKFLOW.md` and use one-shot checks; do not start polling loops.
-- For Linux setup and maintenance, follow `codex-cloud/README.md`. Windows PowerShell scripts require Windows; use the documented portable equivalents in Cloud.
+- Check portable shell syntax with `for file in codex-cloud/*.sh; do bash -n "$file" || exit; done`.
+- In this repository, Linux setup and maintenance are `bash codex-cloud/setup.sh` and `bash codex-cloud/maintenance.sh`. To install the baseline into another repository, follow the explicit Linux copy procedure in `codex-cloud/README.md`. Windows PowerShell scripts require Windows; use the documented portable equivalents in Cloud.

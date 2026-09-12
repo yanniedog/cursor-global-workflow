@@ -18,7 +18,20 @@ Repository-specific setup is preferable when the generic discovery would install
 
 ## Existing repository onboarding
 
-1. Run `scripts/bootstrap-codex-cloud.ps1 -RepoPath <path>` from this repository.
+1. On Windows, run `scripts/bootstrap-codex-cloud.ps1 -RepoPath <path>` from this repository. On Linux, run the following from this repository after setting `target` to the existing repository path. Existing baseline files are preserved:
+
+   ```sh
+   target=/path/to/existing/repository
+   git -C "$target" rev-parse --show-toplevel || exit
+   mkdir -p "$target/.codex/cloud"
+   for file in lib.sh setup.sh maintenance.sh; do
+     if [ ! -e "$target/.codex/cloud/$file" ]; then
+       cp "codex-cloud/$file" "$target/.codex/cloud/$file" || exit
+     fi
+   done
+   ```
+
+   The `.codex/cloud/` environment commands above apply to the installed target. In this source repository, use `bash codex-cloud/setup.sh` and `bash codex-cloud/maintenance.sh`.
 2. Add or refine the root `AGENTS.md` with exact ownership boundaries and verification commands.
 3. Confirm the default branch requires a pull request, passing CI, resolved conversations, and disallows force-push and deletion without an app/admin bypass.
 4. Grant the Codex GitHub App access to this repository.

@@ -175,10 +175,24 @@ Copy CI workflow:
 
 ```sh
 cp workflows/pr-bot-feedback-check.yml YOUR_REPO/.github/workflows/
-# Optional: install the companion request-codex-review.mjs and its lib dependencies first.
-cp workflows/pr-request-bot-reviews.yml YOUR_REPO/.github/workflows/
-# Reviewer presence remains off by default.
+# Optional Codex requests: follow the complete installation below.
 ```
+
+For optional Codex review requests, first install the [ChatGPT Codex Connector](https://github.com/apps/chatgpt-codex-connector) and authorize the intended repository. Successful request posting does not prove that a review completed. Default bootstrap and standard repository creation do not install this optional workflow.
+
+From this source repository, set `target` to the intended repository and copy the complete dependency set. Review existing target files before replacing them:
+
+```sh
+target=/path/to/repository
+mkdir -p "$target/scripts/lib" "$target/.github/workflows"
+cp scripts/request-codex-review.mjs "$target/scripts/"
+for file in pr-gate-exempt.mjs pr-reports-only.mjs gh-pr-review-threads.mjs bot-wait-config.mjs bot-noise.mjs; do
+  cp "scripts/lib/$file" "$target/scripts/lib/$file" || exit
+done
+cp workflows/pr-request-bot-reviews.yml "$target/.github/workflows/"
+```
+
+Commit these files to the protected default branch before enabling requests. Reviewer presence remains off by default.
 
 Copy hook stub:
 
