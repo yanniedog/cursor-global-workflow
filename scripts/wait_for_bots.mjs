@@ -6,6 +6,8 @@
  * and the quiet window are also enforced.
  * Exit 2 = still waiting; exit 1 = error or an explicit requirement timed out.
  */
+import { isBotNoise } from './lib/bot-noise.mjs';
+import { fetchReviewHistory } from './lib/pr-review-history.mjs';
 import { execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -132,13 +134,14 @@ function resolveRepo() {
 }
 
 function resolvePr(prArg, branch) {
+  const fields = 'number,createdAt,updatedAt,headRefName,headRefOid';
   if (prArg) {
-    const r = gh(['pr', 'view', String(prArg), '--json', 'number,createdAt,headRefName'], { json: true });
+    const r = gh(['pr', 'view', String(prArg), '--json', fields], { json: true });
     if (!r.ok) return { error: r.error };
     return { pr: r.data };
   }
   if (!branch) return { pr: null };
-  const r = gh(['pr', 'list', '--state', 'open', '--head', branch, '--json', 'number,createdAt,headRefName'], {
+  const r = gh(['pr', 'list', '--state', 'open', '--head', branch, '--json', fields], {
     json: true,
   });
   if (!r.ok) return { error: r.error };
@@ -161,6 +164,8 @@ function fetchBotActivity(owner, name, prNumber) {
   const pr = r.data?.data?.repository?.pullRequest;
   if (!pr) return { error: 'GraphQL: pull request not found', events: [] };
 
+  try { pr.reviews = { nodes: fetchReviewHistory(owner, name, prNumber) }; }
+  catch (error) { return { error: error.message, events: [] }; }
   const events = [];
   const pushEvent = (login, at, body) => {
     if (!login || !at) return;
@@ -241,7 +246,7 @@ function formatDuration(ms) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
+function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, requiredKeys }) {
   const anchor = new Date(anchorIso);
   if (!Number.isFinite(anchor.getTime())) {
     return { status: 'error', message: `Invalid anchor time: ${anchorIso}` };
@@ -276,11 +281,13 @@ function evaluate({ prNumber, anchorIso, state, repo: repoIn, requiredKeys }) {
   if (activity.error) return { status: 'error', message: activity.error };
 
   const anchorMs = anchor.getTime();
-  const botEventsSinceAnchor = activity.events.filter(
+  const botEventsSinceAnchor = activity.events.filter(e => !isBotNoise(e.body)).filter(
     (e) => isKnownBotLogin(e.login, knownBots) && new Date(e.at).getTime() >= anchorMs,
   );
   const seenLogins = [...new Set(botEventsSinceAnchor.map((e) => e.login))];
-  const missing = missingRequiredKeysFromEvents(requiredKeys, botEventsSinceAnchor);
+  const missing = missingRequiredKeysFromEvents(requiredKeys, botEventsSinceAnchor, {
+    expectedHeadSha,
+  });
   const allRequiredPosted =
     requiredKeys.length > 0 && botEventsSinceAnchor.length > 0 && missing.length === 0;
   const lastBotAt =
@@ -419,6 +426,7 @@ async function main() {
   }
 
   const prNumber = resolved.pr.number;
+  const headSha = resolved.pr.headRefOid;
   const repo = resolveRepo();
   if (!repo) {
     console.error('>>> BOT WAIT ERROR: Could not resolve repository (gh repo view).');
@@ -426,21 +434,30 @@ async function main() {
   }
   let state = readState(prNumber) || {};
   const anchorFromPr = resolved.pr.createdAt;
+  const anchorFromHead = resolved.pr.updatedAt || anchorFromPr;
 
   if (args.botTag) {
     const anchorIso = new Date().toISOString();
-    state = { anchor: anchorIso, readyAt: null, requiredKeys };
+    state = { anchor: anchorIso, readyAt: null, requiredKeys, headSha };
     writeState(prNumber, state);
     console.log(`>>> BOT WAIT: anchor reset (bot-tag) at ${anchorIso} for PR #${prNumber}`);
     console.log(`>>> Required: ${formatRequiredKeys(requiredKeys)}`);
     console.log('>>> Re-run wait-for-bots until exit 0 before synthesis or merge.');
   } else if (args.since) {
     state.anchor = args.since;
+    state.headSha = headSha;
     state.readyAt = null;
+    state.requiredKeys = requiredKeys;
+    writeState(prNumber, state);
+  } else if (state.headSha !== headSha) {
+    state.anchor = anchorFromHead;
+    state.readyAt = null;
+    state.headSha = headSha;
     state.requiredKeys = requiredKeys;
     writeState(prNumber, state);
   } else if (!state.anchor || new Date(state.anchor) < new Date(anchorFromPr)) {
     state.anchor = anchorFromPr;
+    state.headSha = headSha;
     state.requiredKeys = requiredKeys;
     writeState(prNumber, state);
   } else if (!state.requiredKeys) {
@@ -497,6 +514,7 @@ async function main() {
     return evaluate({
       prNumber,
       anchorIso: st.anchor || anchorFromPr,
+      expectedHeadSha: headSha,
       state: st,
       repo,
       requiredKeys: keys,

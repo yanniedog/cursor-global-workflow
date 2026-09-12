@@ -221,6 +221,8 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
   const gateScripts = [
     'pr-bot-feedback-check.mjs',
     'lib/bot-wait-config.mjs',
+    'lib/bot-noise.mjs',
+    'lib/pr-review-history.mjs',
     'lib/bot-wait-presence.mjs',
     'lib/gh-pr-review-threads.mjs',
   ];
