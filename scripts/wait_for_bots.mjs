@@ -435,6 +435,7 @@ async function main() {
     process.exit(1);
   }
   let state = readState(prNumber) || {};
+  const previousWaitStartedAt = state.waitStartedAt;
   startHeadWaitClock(state, headSha, Boolean(args.botTag));
   const anchorFromPr = resolved.pr.createdAt;
   // Head identity scopes Qwen reviews; PR-wide updatedAt includes unrelated comments.
@@ -476,7 +477,7 @@ async function main() {
     writeState(prNumber, state);
   }
 
-  writeState(prNumber, state);
+  if (state.waitStartedAt !== previousWaitStartedAt) writeState(prNumber, state);
   const cliOverride = args.requireBots !== null;
   const envOverride =
     process.env.AR_BOT_WAIT_REQUIRED !== undefined ||
