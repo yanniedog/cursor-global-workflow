@@ -1,0 +1,20 @@
+# Project agent instructions
+
+## Scope and ownership
+
+- Document what this repository owns and the systems it must not change.
+- Preserve unrelated user changes and generated or proprietary artifacts.
+
+## Setup and verification
+
+- Codex Cloud setup: `bash .codex/cloud/setup.sh`
+- Codex Cloud maintenance: `bash .codex/cloud/maintenance.sh`
+- Required runtime versions: REPLACE_WITH_PINNED_VERSIONS
+- Primary verification: REPLACE_WITH_EXACT_COMMAND
+- Add narrower commands for documentation-only or isolated package changes when useful.
+
+## Cloud boundaries
+
+- Keep agent internet access off unless this repository documents a narrow read-only allowlist.
+- Do not provide deployment, signing, production, SSH, release, or broad GitHub credentials to the Cloud environment.
+- Use a topic branch and pull request. Do not push the default branch, merge, deploy, publish, or change repository settings from a Cloud task.

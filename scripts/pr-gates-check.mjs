@@ -51,8 +51,8 @@ Gates enforced:
   branch-fresh               PR head up to date with base (no BEHIND / conflicts)
   auto-merge                 Squash auto-merge enabled (gh pr merge --auto)
   ci-required                Required GitHub checks green (gh pr checks --required)
-  github-bot-gates           bot-presence-gate + bot-feedback-gate when reported
-  wait-for-bots              npm run wait-for-bots -- --pr N (exit 0)
+  github-bot-gates           bot-feedback-gate when reported
+  wait-for-bots              required CI settlement; reviewers are advisory by default
   pr-bot-feedback-check      npm run pr:bot-feedback-check -- --pr N (exit 0)
   feedback-plan              ## Feedback plan when bot wait ready and threads open
   ship-closeout-subgates     wait + thread gates (ship:closeout:strict embeds these)

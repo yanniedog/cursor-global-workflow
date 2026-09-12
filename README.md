@@ -1,5 +1,17 @@
 # cursor-global-workflow
 
+## Codex Cloud baseline
+
+The portable Cloud baseline lives in [`codex-cloud/`](codex-cloud/README.md). It provides lockfile-driven Linux setup and cache maintenance scripts plus a repository template and a safe onboarding checklist.
+
+Bootstrap a repository without overwriting existing instructions:
+
+```powershell
+.\scripts\bootstrap-codex-cloud.ps1 -RepoPath C:\code\my-project
+```
+
+Add `-CreateAgentsTemplate` only when the repository has no root `AGENTS.md`; replace the marked project-specific verification placeholder before committing it. Codex Cloud environments and GitHub access remain per-repository account settings and must pass the canary checks documented in `codex-cloud/README.md`.
+
 Reusable Cursor agents, rules, and scripts for **all** projects — chief coordination, ship bar, bot wait, PR thread closure, and browser QA.
 
 Install once per machine. After install, **every git repo** under your code folder is bootstrapped automatically when you open it in **Cursor** (zero manual steps per repo).
@@ -19,11 +31,27 @@ On each session start, if `.cursor/workflow-bootstrapped` is missing or older th
 - `.cursor/rules/00-use-global-workflow.mdc` (from installed template)
 - `.cursor/workflow-bootstrapped` (version marker)
 - `WORKFLOW.md` at repo root **only if missing** (never overwrites)
+- `.github/workflows/pr-bot-feedback-check.yml` and its script dependencies when missing
 - npm script stubs in `package.json` **only for missing keys** (never overwrites existing scripts)
 
 Idempotent and fast; no secrets.
 
-**New repos:** create or `git init` a folder under your code directory, open it in Cursor once — bootstrap runs via `sessionStart`.
+**New repos:** use the guarded creator so GitHub settings are correct on the
+first pushed branch:
+
+```powershell
+npm run repo:create:standard -- --name my-project `
+  --setup-command "npm ci" `
+  --verify-command "npm test" `
+  --private
+```
+
+It creates deterministic `repo-ci`, installs `bot-feedback-gate` and the
+single-shot/default-base-safe PR tools, then applies strict protection,
+squash-only auto-merge, branch deletion, read-only Actions permissions, and
+advisory reviewer variables. GitHub personal accounts have no account-wide
+default-repository policy switch, so this command is the mandatory creation
+path for future repositories.
 
 **Existing repos (one-time batch):**
 
@@ -60,7 +88,7 @@ When you change shared agent plumbing in **any** project, mirror it here **in th
 | Must mirror | Examples |
 |-------------|----------|
 | Skills | `chief-agent`, `workflow-orchestrator`, `deep-browser-explore`, `agent-auditor` |
-| Scripts | `wait_for_bots.mjs`, `chief-scan.mjs`, `pr-bot-feedback-check*`, `ship-closeout*`, `agent-auditor-scan*`, `orchestrator-remind`, `repo-auto-bootstrap.mjs` |
+| Scripts | `wait_for_bots.mjs`, `pr-arm-and-park.mjs`, `pr-bot-feedback-check*`, `create-standard-repo.mjs`, `chief-scan.mjs`, `agent-auditor-scan*`, `orchestrator-remind`, `repo-auto-bootstrap.mjs` |
 | Hooks | `auditor-watch.mjs`, `orchestrator-remind.mjs` |
 | Rules | `chief-agent-always`, `workflow-orchestrator-always`, `agent-auditor-always`, ship-bar rules in `rules/` |
 
@@ -130,6 +158,7 @@ Add npm scripts (merge into existing `package.json`):
     "pr:bot-feedback-check": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-bot-feedback-check.mjs\"",
     "pr:bot-feedback-audit": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-bot-feedback-check.mjs\" --audit-merged --limit 20",
     "pr:gates:check": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-gates-check.mjs\"",
+    "pr:arm-and-park": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-arm-and-park.mjs\"",
     "pr:watch-once": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-watch-once.mjs\"",
     "pr:queue:drive": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-queue-drive.mjs\"",
     "pr:update-branch": "node \"%CURSOR_WORKFLOW_SCRIPTS%\\pr-update-branch.mjs\"",

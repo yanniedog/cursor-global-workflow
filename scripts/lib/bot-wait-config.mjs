@@ -1,6 +1,6 @@
 /**
  * Required-bot aliases for wait-for-bots and pr-bot-feedback-check.
- * Keys are short names (gemini, codex, sourcery, cursor); values are GitHub logins to match.
+ * Keys are short names (gemini, codex, sourcery, qwen, cursor); values are GitHub logins to match.
  */
 export const BOT_ALIASES = {
   gemini: [
@@ -8,13 +8,19 @@ export const BOT_ALIASES = {
     'gemini-code-assist[bot]',
     'google-github-actions-bot[bot]',
     'google-github-actions[bot]',
+    // sshnaidm/gemini-code-review-action posts as github-actions[bot]
+    // (matched via isGeminiCodeReviewBody, not bare login).
+    'github-actions[bot]',
   ],
   codex: ['chatgpt-codex-connector', 'chatgpt-codex-connector[bot]'],
   sourcery: ['sourcery-ai', 'sourcery-ai[bot]'],
+  qwen: ['github-actions[bot]'],
   cursor: ['github-actions[bot]'],
 };
 
-export const DEFAULT_REQUIRED_KEYS = ['gemini', 'codex', 'sourcery'];
+// Review vendors are advisory. Merge liveness must not depend on a local
+// runner, vendor quota, or an installation outside the repository's control.
+export const DEFAULT_REQUIRED_KEYS = [];
 
 export const OPTIONAL_BOT_LOGINS = [
   'github-actions[bot]',
@@ -23,12 +29,51 @@ export const OPTIONAL_BOT_LOGINS = [
   'greptile-apps[bot]',
 ];
 
+export function isQwenCodeReviewBody(bodyRaw) {
+  return /<!--\s*(qwen-code-review|cursor-auto-review)\s*-->/i.test(String(bodyRaw || ''));
+}
+
+export function isGeminiCodeReviewBody(bodyRaw) {
+  const body = String(bodyRaw || '');
+  return (
+    /<!--\s*gemini-code-review\s*-->/i.test(body) ||
+    /#\s*Code Review by Gemini/i.test(body) ||
+    /\bCode Review by Gemini\b/i.test(body)
+  );
+}
+
+/** @deprecated Use isQwenCodeReviewBody — accepts legacy cursor-auto-review marker too. */
 export function isCursorAutoReviewBody(bodyRaw) {
-  return /<!--\s*cursor-auto-review\s*-->/i.test(String(bodyRaw || ''));
+  return isQwenCodeReviewBody(bodyRaw);
+}
+
+/**
+ * Body-aware match so github-actions[bot] Qwen vs Gemini reviews do not
+ * satisfy each other's required keys.
+ */
+export function eventSatisfiesRequiredKey(login, body, key) {
+  const lower = String(login || '').toLowerCase();
+  const k = String(key || '').toLowerCase();
+  if (!lower) return false;
+  if (k === 'qwen' || k === 'cursor') {
+    return lower === 'github-actions[bot]' && isQwenCodeReviewBody(body);
+  }
+  if (k === 'gemini') {
+    if (lower === 'github-actions[bot]') return isGeminiCodeReviewBody(body);
+    return loginMatchesRequiredKey(login, 'gemini');
+  }
+  return loginMatchesRequiredKey(login, key);
+}
+
+export function missingRequiredKeysFromEvents(requiredKeys, events) {
+  return (requiredKeys || []).filter(
+    (key) => !(events || []).some((e) => eventSatisfiesRequiredKey(e.login, e.body, key)),
+  );
 }
 
 export function parseRequiredKeys(raw) {
   if (!raw || !String(raw).trim()) return [...DEFAULT_REQUIRED_KEYS];
+  if (/^(off|none|disabled)$/i.test(String(raw).trim())) return [];
   return String(raw)
     .split(',')
     .map((s) => s.trim().toLowerCase())
@@ -36,7 +81,9 @@ export function parseRequiredKeys(raw) {
 }
 
 export function resolveRequiredKeys(argvKeys, envRaw) {
-  if (argvKeys?.length) return argvKeys;
+  // An explicitly supplied empty list means "off"; do not resurrect a saved
+  // or environment policy.
+  if (Array.isArray(argvKeys)) return argvKeys;
   const fromEnv = envRaw ?? process.env.AR_BOT_WAIT_REQUIRED ?? process.env.BOT_WAIT_REQUIRED ?? '';
   return parseRequiredKeys(fromEnv);
 }
@@ -71,5 +118,6 @@ export function missingRequiredKeys(requiredKeys, seenLogins) {
 }
 
 export function formatRequiredKeys(keys) {
+  if (!keys.length) return 'none (reviewers advisory)';
   return keys.map((k) => `${k} (${loginsForKey(k).join(' | ')})`).join(', ');
 }

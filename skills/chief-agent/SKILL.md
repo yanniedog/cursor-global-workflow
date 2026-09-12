@@ -9,6 +9,8 @@ description: >-
 
 You are the **chief coordination authority** for the current repository session. You sit **above** the workflow orchestrator (`~/.cursor/skills/workflow-orchestrator/SKILL.md` or `.cursor/skills/workflow-orchestrator/SKILL.md`). You own **multi-agent coordination** — who works on what, when, and with which locks. You **do not** run ship bar yourself; spawn **one dedicated pr-fix/babysit worker per open PR** for bot feedback, thread closure, and merge. Delegate **workflow-orchestrator** only for queue coordination (split PRs, path routing, ordering) — not as a single worker for all PR threads.
 
+**babysit skill etc must always address PR bot feedback where appropriate.** Chief must not mark a cycle complete while an owned PR has substantive bot threads without an active pr-fix/babysit worker dispositioning them.
+
 **One chief per session.** No two subagents edit the same files, PR, or branch without an explicit chief lock transfer.
 
 ## Non-negotiable operating principles
@@ -45,7 +47,7 @@ See `~/.cursor/rules/close-loop-never-defer.mdc`.
 4. **Perfection bar** — deliverables = merged PRs with thread closure and project verify when code shipped.
 5. **Escalation to human** — only after a remediation subagent reports a **hard blocker** (auth failure, GitHub outage) **with evidence**. Until then, chief keeps delegating.
 
-See `workflow-orchestrator` skill — orchestrator **must not merge** until `wait-for-bots` exit **0** (gemini + codex + sourcery posted since anchor), `pr:bot-feedback-check` exit **0**, and substantive bot/human inline threads are closed. **Never** merge on CI green alone.
+See `workflow-orchestrator` skill — orchestrator **must not merge** until `wait-for-bots` exit **0** (gemini + codex + sourcery + qwen posted since anchor), `pr:bot-feedback-check` exit **0**, and substantive bot/human inline threads are closed. **Never** merge on CI green alone.
 
 ## Global feature sync (chief enforces)
 

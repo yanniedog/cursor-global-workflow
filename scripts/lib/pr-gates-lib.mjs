@@ -2,13 +2,13 @@
  * Shared helpers for npm run pr:gates:check (merge-blocking PR gate audit).
  */
 import { spawnSync } from 'node:child_process';
-import { readBotWaitStateFile } from './bot-wait-state.mjs';
 import { hasGh, ghJson, repoSlug } from './gh-pr-review-threads.mjs';
 import { fetchPrMergeMeta, gateAutoMergeEnabled, gateBranchFreshMeta } from './pr-branch-sync.mjs';
 import { gateExemptReason } from './pr-gate-exempt.mjs';
-import { gitRepoRoot, runWorkflowScript } from './workflow-paths.mjs';
+import { fetchRequiredCheckState } from './required-ci-checks.mjs';
+import { runWorkflowScript } from './workflow-paths.mjs';
 
-export const BOT_GATE_CHECK_NAMES = ['bot-presence-gate', 'bot-feedback-gate'];
+export const BOT_GATE_CHECK_NAMES = ['bot-feedback-gate'];
 
 const FEEDBACK_PLAN_RE = /##\s*feedback\s+plan\b/i;
 
@@ -97,70 +97,37 @@ export function resolvePrNumber(prArg) {
 }
 
 export function fetchRequiredCi(prNumber) {
-  const r = spawnSync(
-    'gh',
-    ['pr', 'checks', String(prNumber), '--required', '--json', 'name,bucket,state'],
-    { encoding: 'utf8' },
-  );
-  if (r.status === 8) {
-    return { ok: true, pending: true, failed: false, failedNames: [], checks: [] };
+  let pr;
+  let repo;
+  try {
+    pr = ghJson([
+      'pr',
+      'view',
+      String(prNumber),
+      '--json',
+      'headRefOid,baseRefName',
+    ]);
+    repo = repoSlug();
+  } catch (error) {
+    return { ok: false, error: error.message };
   }
-  if (r.status !== 0) {
-    const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
-    if (/no checks reported/i.test(msg) || /no required checks reported/i.test(msg)) {
-      return { ok: true, pending: false, failed: false, failedNames: [], checks: [] };
-    }
-    return { ok: false, error: msg };
-  }
-  const checks = JSON.parse(r.stdout || '[]');
-  let pending = false;
-  let failed = false;
-  const failedNames = [];
-  for (const c of checks) {
-    if (c.bucket === 'pending') pending = true;
-    if (
-      c.bucket === 'fail' ||
-      c.bucket === 'cancel' ||
-      c.state === 'FAILURE' ||
-      c.state === 'ERROR' ||
-      c.state === 'CANCELLED'
-    ) {
-      failed = true;
-      failedNames.push(c.name);
-    }
-  }
-  return { ok: true, pending, failed, failedNames, checks };
-}
-
-export function fetchNamedChecks(prNumber, names) {
-  const r = spawnSync(
-    'gh',
-    ['pr', 'checks', String(prNumber), '--json', 'name,bucket,state,completedAt'],
-    { encoding: 'utf8' },
-  );
-  if (r.status !== 0) {
-    const msg = (r.stderr || '').trim() || `gh pr checks exit ${r.status}`;
-    if (/no checks reported/i.test(msg)) return { found: {}, skipped: true };
-    return { found: {}, error: msg };
-  }
-  const all = JSON.parse(r.stdout || '[]');
-  const want = new Set(names.map((n) => n.toLowerCase()));
-  const found = {};
-  for (const c of all) {
-    const lower = (c.name || '').toLowerCase();
-    const tail = lower.includes('/') ? lower.slice(lower.lastIndexOf('/') + 1) : lower;
-    for (const key of want) {
-      if (lower === key || tail === key) found[key] = c;
-    }
-  }
-  return { found };
-}
-
-function checkBucketPass(c) {
-  if (!c) return null;
-  if (c.bucket === 'pass' || c.state === 'SUCCESS') return true;
-  if (c.bucket === 'pending' || c.state === 'PENDING' || c.state === 'IN_PROGRESS') return false;
-  return false;
+  const fallbackRequiredNames = (process.env.PR_REQUIRED_CHECKS || 'bot-feedback-gate')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const result = fetchRequiredCheckState({
+    prNumber,
+    repo: `${repo.owner}/${repo.name}`,
+    headSha: pr.headRefOid,
+    baseRefName: pr.baseRefName,
+    fallbackRequiredNames,
+  });
+  if (result.error) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    ...result,
+    missing: result.missingNames.length > 0,
+  };
 }
 
 export function gateCiRequired(prNumber) {
@@ -173,73 +140,59 @@ export function gateCiRequired(prNumber) {
       id: 'ci-required',
       pass: false,
       detail: `Failed: ${ci.failedNames.join(', ')}`,
-      action: 'Fix failing required checks; gh pr checks <n> --watch',
+      action: 'Fix failing required checks, then re-run pr:arm-and-park once',
     };
   }
   if (ci.pending) {
     return {
       id: 'ci-required',
       pass: false,
-      detail: 'Required checks still pending',
-      action: 'Wait for CI; gh pr checks <n> --watch',
+      detail: ci.missing
+        ? 'Required checks have not reported on the current head yet'
+        : 'Required checks still pending',
+      pending: true,
+      action: 'CI is pending; park without polling and re-run pr:arm-and-park on wake',
     };
   }
   return { id: 'ci-required', pass: true, detail: 'All required checks passed' };
 }
 
 export function gateGithubBotChecks(prNumber) {
-  const { found, error, skipped } = fetchNamedChecks(prNumber, BOT_GATE_CHECK_NAMES);
-  if (error) {
+  const exact = fetchRequiredCi(prNumber);
+  if (!exact.ok) {
     return {
       id: 'github-bot-gates',
       pass: false,
-      detail: error,
-      action: 'Ensure GitHub Actions workflows pr-bot-presence-gate and pr-bot-feedback-check ran',
+      detail: exact.error,
+      action: 'Ensure the pr-bot-feedback-check workflow ran on the PR head',
     };
   }
-  if (skipped || !BOT_GATE_CHECK_NAMES.some((name) => found[name])) {
-    return {
-      id: 'github-bot-gates',
-      pass: true,
-      detail: 'No GitHub bot gate checks reported; relying on local wait/thread gates',
-      skipped: true,
-    };
-  }
+  const failed = new Set(exact.failedNames || []);
+  const pending = new Set(exact.pendingNames || []);
+  const missing = new Set(exact.missingNames || []);
   const parts = [];
   let pass = true;
-  let botPresencePass = false;
-  let botPresenceCompletedAt = null;
   for (const name of BOT_GATE_CHECK_NAMES) {
-    const c = found[name];
-    if (!c) {
+    if (missing.has(name)) {
       parts.push(`${name}: not reported yet`);
       pass = false;
-      continue;
-    }
-    const ok = checkBucketPass(c);
-    if (ok === true) {
-      parts.push(`${name}: pass`);
-      if (name === 'bot-presence-gate') {
-        botPresencePass = true;
-        botPresenceCompletedAt = c.completedAt || null;
-      }
-    } else if (ok === false) {
-      parts.push(`${name}: ${c.bucket || c.state}`);
+    } else if (failed.has(name)) {
+      parts.push(`${name}: failure`);
+      pass = false;
+    } else if (pending.has(name)) {
+      parts.push(`${name}: pending`);
       pass = false;
     } else {
-      parts.push(`${name}: ${c.bucket || c.state} (failed)`);
-      pass = false;
+      parts.push(`${name}: pass`);
     }
   }
   return {
     id: 'github-bot-gates',
     pass,
     detail: parts.join('; '),
-    botPresencePass,
-    botPresenceCompletedAt,
     action: pass
       ? undefined
-      : 'Wait for bot-presence-gate and bot-feedback-gate on GitHub (branch protection)',
+      : 'Resolve substantive review threads and refresh bot-feedback-gate on the PR head',
   };
 }
 
@@ -257,19 +210,6 @@ export function gateWaitForBots(prNumber, githubBotGate) {
       skipped: true,
     };
   }
-  if (githubBotGate?.botPresencePass) {
-    const state = readBotWaitStateFile(prNumber, gitRepoRoot());
-    const anchorMs = new Date(state?.anchor || '').getTime();
-    const gateMs = new Date(githubBotGate.botPresenceCompletedAt || '').getTime();
-    if (!Number.isFinite(anchorMs) || (Number.isFinite(gateMs) && anchorMs <= gateMs)) {
-      return {
-        id: 'wait-for-bots',
-        pass: true,
-        detail: 'Bot wait satisfied by green GitHub bot-presence-gate',
-        exitCode: 0,
-      };
-    }
-  }
   const { exitCode, stderr, stdout } = runNodeScript('wait_for_bots.mjs', ['--pr', String(prNumber)]);
   if (exitCode === 0) {
     return { id: 'wait-for-bots', pass: true, detail: 'Bot wait satisfied (exit 0)', exitCode };
@@ -282,7 +222,7 @@ export function gateWaitForBots(prNumber, githubBotGate) {
     exitCode,
     action:
       exitCode === 2
-        ? `npm run wait-for-bots -- --watch --pr ${prNumber}`
+        ? `Re-run npm run wait-for-bots -- --pr ${prNumber} after CI settles`
         : `npm run wait-for-bots -- --pr ${prNumber} (exit 1 = missing bots or error — do not merge)`,
   };
 }
@@ -360,9 +300,11 @@ export function gateFeedbackPlan(prNumber, { skip, waitPass, feedbackPass }) {
 
 export function gateShipCloseoutSubgates(waitGate, feedbackGate) {
   const pass = waitGate.pass && feedbackGate.pass;
+  const waiting = !pass && waitGate.exitCode === 2 && feedbackGate.pass;
   return {
     id: 'ship-closeout-subgates',
     pass,
+    exitCode: pass ? 0 : waiting ? 2 : 1,
     detail: pass
       ? 'Same checks ship:closeout:strict runs on topic branches (merge blockers clear)'
       : 'ship:closeout:strict would exit 2 until wait-for-bots and pr:bot-feedback-check pass',

@@ -19,6 +19,7 @@ const NPM_STUBS = {
   'pr:bot-feedback-check': 'pr-bot-feedback-check.mjs',
   'pr:bot-feedback-audit': 'pr-bot-feedback-check.mjs --audit-merged --limit 20',
   'pr:gates:check': 'pr-gates-check.mjs',
+  'pr:arm-and-park': 'pr-arm-and-park.mjs',
   'pr:watch-once': 'pr-watch-once.mjs',
   'pr:queue:drive': 'pr-queue-drive.mjs',
   'pr:update-branch': 'pr-update-branch.mjs',
@@ -118,14 +119,6 @@ function copyTemplateIfMissing(src, dest, relDest, result) {
   return true;
 }
 
-function copyTemplateAlways(src, dest, relDest, result) {
-  if (!existsSync(src)) return false;
-  mkdirSync(dirname(dest), { recursive: true });
-  copyFileSync(src, dest);
-  if (!result.files.includes(relDest)) result.files.push(relDest);
-  return true;
-}
-
 /**
  * @param {string} workspaceRoot
  * @param {{ dryRun?: boolean }} [opts]
@@ -178,23 +171,21 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
   const templatesDir = join(scriptsRoot, 'templates');
   const ruleTemplate = join(templatesDir, '00-use-global-workflow.mdc');
   const workflowTemplate = join(templatesDir, 'WORKFLOW.md');
-  const cursorReviewWorkflowTemplate = join(
+  const feedbackWorkflowTemplate = join(
     templatesDir,
     '.github',
     'workflows',
-    'cursor-auto-pr-review.yml',
+    'pr-bot-feedback-check.yml',
   );
-  const cursorReviewPromptTemplate = join(templatesDir, '.cursor', 'PR_REVIEW_PROMPT.md');
   const cursorCliConfigTemplate = join(templatesDir, '.cursor', 'cli.json');
   const ruleDest = join(rulesDir, '00-use-global-workflow.mdc');
   const workflowDest = join(workspaceRoot, 'WORKFLOW.md');
-  const cursorReviewWorkflowDest = join(
+  const feedbackWorkflowDest = join(
     workspaceRoot,
     '.github',
     'workflows',
-    'cursor-auto-pr-review.yml',
+    'pr-bot-feedback-check.yml',
   );
-  const cursorReviewPromptDest = join(cursorDir, 'PR_REVIEW_PROMPT.md');
   const cursorCliConfigDest = join(cursorDir, 'cli.json');
 
   if (dryRun) {
@@ -220,26 +211,27 @@ export function bootstrapRepo(workspaceRoot, opts = {}) {
   }
 
   copyTemplateIfMissing(
-    cursorReviewWorkflowTemplate,
-    cursorReviewWorkflowDest,
-    '.github/workflows/cursor-auto-pr-review.yml',
-    result,
-  );
-  if (markerVersion !== null) {
-    copyTemplateAlways(
-      cursorReviewWorkflowTemplate,
-      cursorReviewWorkflowDest,
-      '.github/workflows/cursor-auto-pr-review.yml',
-      result,
-    );
-  }
-  copyTemplateIfMissing(
-    cursorReviewPromptTemplate,
-    cursorReviewPromptDest,
-    '.cursor/PR_REVIEW_PROMPT.md',
+    feedbackWorkflowTemplate,
+    feedbackWorkflowDest,
+    '.github/workflows/pr-bot-feedback-check.yml',
     result,
   );
   copyTemplateIfMissing(cursorCliConfigTemplate, cursorCliConfigDest, '.cursor/cli.json', result);
+
+  const gateScripts = [
+    'pr-bot-feedback-check.mjs',
+    'lib/bot-wait-config.mjs',
+    'lib/bot-wait-presence.mjs',
+    'lib/gh-pr-review-threads.mjs',
+  ];
+  for (const rel of gateScripts) {
+    copyTemplateIfMissing(
+      join(scriptsRoot, rel),
+      join(workspaceRoot, 'scripts', rel),
+      `scripts/${rel}`,
+      result,
+    );
+  }
 
   const pkgPath = join(workspaceRoot, 'package.json');
   result.packageJson = patchPackageJson(pkgPath, scriptsRoot);
