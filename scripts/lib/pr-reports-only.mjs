@@ -28,9 +28,14 @@ export function isReportsOnlyFileList(files) {
   });
 }
 
-export function fetchPrChangedPaths(prNumber) {
-  const view = ghJson(['pr', 'view', String(prNumber), '--json', 'files']);
-  return (view.files || []).map((f) => f.path);
+export function fetchPrChangedPaths(prNumber, runGh = ghJson) {
+  const repo = runGh(['repo', 'view', '--json', 'nameWithOwner']).nameWithOwner;
+  const view = runGh(['pr', 'view', String(prNumber), '--json', 'changedFiles']);
+  const pages = runGh(['api', '--paginate', '--slurp',
+    `repos/${repo}/pulls/${prNumber}/files?per_page=100`]);
+  const files = pages.flat().map(file => file.filename);
+  if (files.length !== view.changedFiles) throw new Error('Incomplete PR file coverage; exemption unavailable');
+  return files;
 }
 
 export function isReportsOnlyPr(prNumber) {
