@@ -6,6 +6,7 @@
  * and the quiet window are also enforced.
  * Exit 2 = still waiting; exit 1 = error or an explicit requirement timed out.
  */
+import { startHeadWaitClock, elapsedHeadWait, setExplicitWaitClock } from './lib/bot-wait-clock.mjs';
 import { isBotNoise } from './lib/bot-noise.mjs';
 import { fetchReviewHistory } from './lib/pr-review-history.mjs';
 import { execSync, spawnSync } from 'node:child_process';
@@ -274,7 +275,7 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
   }
 
   const knownBots = allKnownBotLogins(requiredKeys);
-  const elapsedMs = Date.now() - anchor.getTime();
+  const elapsedMs = elapsedHeadWait(state, anchor);
   const maxMs = MAX_WAIT_MIN * 60 * 1000;
 
   const activity = fetchBotActivity(repo.owner, repo.name, prNumber);
@@ -299,24 +300,6 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
     lastBotAt !== null &&
     Date.now() - lastBotAt.getTime() >= QUIET_WINDOW_SEC * 1000;
 
-  if (elapsedMs > maxMs) {
-    if (missing.length) {
-      return {
-        status: 'timeout',
-        message:
-          `Required bot(s) never posted before safety cap (${MAX_WAIT_MIN} min): ${missing.join(', ')}. ` +
-          `DO NOT MERGE. Tag bots or extend cap; expected: ${formatRequiredKeys(requiredKeys)}.`,
-        missing,
-        botsSeen: seenLogins,
-      };
-    }
-    return {
-      status: 'timeout',
-      message:
-        `Bot wait safety cap (${MAX_WAIT_MIN} min) exceeded since anchor ${anchor.toISOString()} ` +
-        'without satisfying quiet window. Re-sweep manually or tag bots again.',
-    };
-  }
 
   const checksReady = !checks.pending;
   const minElapsed = elapsedMs >= MIN_WAIT_SEC * 1000;
@@ -340,6 +323,25 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
       lastBotAt: lastBotAt?.toISOString() || null,
       botsSeen: seenLogins,
       missing: [],
+    };
+  }
+
+  if (elapsedMs > maxMs) {
+    if (missing.length) {
+      return {
+        status: 'timeout',
+        message:
+          `Required bot(s) never posted before safety cap (${MAX_WAIT_MIN} min): ${missing.join(', ')}. ` +
+          `DO NOT MERGE. Tag bots or extend cap; expected: ${formatRequiredKeys(requiredKeys)}.`,
+        missing,
+        botsSeen: seenLogins,
+      };
+    }
+    return {
+      status: 'timeout',
+      message:
+        `Bot wait safety cap (${MAX_WAIT_MIN} min) exceeded since wait start ${state?.waitStartedAt || anchor.toISOString()} ` +
+        'without satisfying quiet window. Re-sweep manually or tag bots again.',
     };
   }
 
@@ -433,6 +435,8 @@ async function main() {
     process.exit(1);
   }
   let state = readState(prNumber) || {};
+  const previousWaitStartedAt = state.waitStartedAt;
+  startHeadWaitClock(state, headSha, Boolean(args.botTag));
   const anchorFromPr = resolved.pr.createdAt;
   // Head identity scopes Qwen reviews; PR-wide updatedAt includes unrelated comments.
   // Retain all potentially valid reviews when migrating or switching heads.
@@ -440,12 +444,14 @@ async function main() {
 
   if (args.botTag) {
     const anchorIso = new Date().toISOString();
-    state = { anchor: anchorIso, readyAt: null, requiredKeys, headSha };
+    state = { anchor: anchorIso, readyAt: null, requiredKeys, headSha, waitStartedAt: state.waitStartedAt };
     writeState(prNumber, state);
     console.log(`>>> BOT WAIT: anchor reset (bot-tag) at ${anchorIso} for PR #${prNumber}`);
     console.log(`>>> Required: ${formatRequiredKeys(requiredKeys)}`);
     console.log('>>> Re-run wait-for-bots until exit 0 before synthesis or merge.');
   } else if (args.since) {
+    try { setExplicitWaitClock(state, args.since); }
+    catch (error) { console.error(error.message); process.exit(1); }
     state.anchor = args.since;
     state.headSha = headSha;
     state.readyAt = null;
@@ -471,6 +477,7 @@ async function main() {
     writeState(prNumber, state);
   }
 
+  if (state.waitStartedAt !== previousWaitStartedAt) writeState(prNumber, state);
   const cliOverride = args.requireBots !== null;
   const envOverride =
     process.env.AR_BOT_WAIT_REQUIRED !== undefined ||
