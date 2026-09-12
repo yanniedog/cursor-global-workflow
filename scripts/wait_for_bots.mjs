@@ -437,6 +437,11 @@ async function main() {
   let state = readState(prNumber) || {};
   const previousWaitStartedAt = state.waitStartedAt;
   startHeadWaitClock(state, headSha, Boolean(args.botTag));
+  let clockNeedsPersistence = state.waitStartedAt !== previousWaitStartedAt;
+  const persistWaitState = () => {
+    writeState(prNumber, state);
+    clockNeedsPersistence = false;
+  };
   const anchorFromPr = resolved.pr.createdAt;
   // Head identity scopes Qwen reviews; PR-wide updatedAt includes unrelated comments.
   // Retain all potentially valid reviews when migrating or switching heads.
@@ -445,7 +450,7 @@ async function main() {
   if (args.botTag) {
     const anchorIso = new Date().toISOString();
     state = { anchor: anchorIso, readyAt: null, requiredKeys, headSha, waitStartedAt: state.waitStartedAt };
-    writeState(prNumber, state);
+    persistWaitState();
     console.log(`>>> BOT WAIT: anchor reset (bot-tag) at ${anchorIso} for PR #${prNumber}`);
     console.log(`>>> Required: ${formatRequiredKeys(requiredKeys)}`);
     console.log('>>> Re-run wait-for-bots until exit 0 before synthesis or merge.');
@@ -456,28 +461,28 @@ async function main() {
     state.headSha = headSha;
     state.readyAt = null;
     state.requiredKeys = requiredKeys;
-    writeState(prNumber, state);
+    persistWaitState();
   } else if (!state.headSha && state.anchor && new Date(state.anchor) >= new Date(anchorFromPr)) {
     state.headSha = headSha;
     state.requiredKeys = requiredKeys;
-    writeState(prNumber, state);
+    persistWaitState();
   } else if (state.headSha !== headSha) {
     state.anchor = anchorFromHead;
     state.readyAt = null;
     state.headSha = headSha;
     state.requiredKeys = requiredKeys;
-    writeState(prNumber, state);
+    persistWaitState();
   } else if (!state.anchor || new Date(state.anchor) < new Date(anchorFromPr)) {
     state.anchor = anchorFromPr;
     state.headSha = headSha;
     state.requiredKeys = requiredKeys;
-    writeState(prNumber, state);
+    persistWaitState();
   } else if (!state.requiredKeys) {
     state.requiredKeys = requiredKeys;
-    writeState(prNumber, state);
+    persistWaitState();
   }
 
-  if (state.waitStartedAt !== previousWaitStartedAt) writeState(prNumber, state);
+  if (clockNeedsPersistence) persistWaitState();
   const cliOverride = args.requireBots !== null;
   const envOverride =
     process.env.AR_BOT_WAIT_REQUIRED !== undefined ||
