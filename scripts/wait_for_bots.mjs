@@ -6,7 +6,7 @@
  * and the quiet window are also enforced.
  * Exit 2 = still waiting; exit 1 = error or an explicit requirement timed out.
  */
-import { startHeadWaitClock, elapsedHeadWait } from './lib/bot-wait-clock.mjs';
+import { startHeadWaitClock, elapsedHeadWait, setExplicitWaitClock } from './lib/bot-wait-clock.mjs';
 import { isBotNoise } from './lib/bot-noise.mjs';
 import { fetchReviewHistory } from './lib/pr-review-history.mjs';
 import { execSync, spawnSync } from 'node:child_process';
@@ -435,7 +435,7 @@ async function main() {
     process.exit(1);
   }
   let state = readState(prNumber) || {};
-  startHeadWaitClock(state, headSha, Boolean(args.botTag || args.since));
+  startHeadWaitClock(state, headSha, Boolean(args.botTag));
   const anchorFromPr = resolved.pr.createdAt;
   // Head identity scopes Qwen reviews; PR-wide updatedAt includes unrelated comments.
   // Retain all potentially valid reviews when migrating or switching heads.
@@ -449,6 +449,8 @@ async function main() {
     console.log(`>>> Required: ${formatRequiredKeys(requiredKeys)}`);
     console.log('>>> Re-run wait-for-bots until exit 0 before synthesis or merge.');
   } else if (args.since) {
+    try { setExplicitWaitClock(state, args.since); }
+    catch (error) { console.error(error.message); process.exit(1); }
     state.anchor = args.since;
     state.headSha = headSha;
     state.readyAt = null;
