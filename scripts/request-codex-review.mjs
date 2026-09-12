@@ -29,8 +29,7 @@ function isCodexLogin(login) {
   return loginMatchesRequiredKey(login, 'codex');
 }
 
-function codexSeenOnPr(prNumber) {
-  const view = ghJson(['pr', 'view', String(prNumber), '--json', 'comments,reviews']);
+function codexSeenOnPr(view) {
   const logins = [
     ...(view?.comments || []).map((c) => c.author?.login),
     ...(view?.reviews || []).map((r) => r.author?.login),
@@ -38,8 +37,7 @@ function codexSeenOnPr(prNumber) {
   return logins.some((login) => isCodexLogin(login));
 }
 
-function triggerAlreadyPosted(prNumber) {
-  const view = ghJson(['pr', 'view', String(prNumber), '--json', 'comments']);
+function triggerAlreadyPosted(view) {
   const comments = view?.comments || [];
   return comments.some((c) => /@codex review/i.test(String(c.body || '')));
 }
@@ -68,18 +66,24 @@ function main() {
   }
 
   const prNumber = String(args.pr).trim();
+  if (!/^[1-9][0-9]*$/.test(prNumber)) throw new Error('PR must be a positive number');
   const exempt = gateExemptReason(prNumber);
   if (exempt) {
     console.log(`request-codex-review: PR #${prNumber} gate-exempt (${exempt}) — skip`);
     process.exit(0);
   }
 
-  if (codexSeenOnPr(prNumber)) {
+  const view = ghJson(['pr', 'view', prNumber, '--json', 'comments,reviews,isDraft']);
+  if (view.isDraft) {
+    console.log(`request-codex-review: PR #${prNumber} is draft - skip`);
+    return;
+  }
+  if (codexSeenOnPr(view)) {
     console.log(`request-codex-review: codex already present on PR #${prNumber} — skip`);
     process.exit(0);
   }
 
-  if (triggerAlreadyPosted(prNumber)) {
+  if (triggerAlreadyPosted(view)) {
     console.log(`request-codex-review: @codex review already requested on PR #${prNumber} — skip`);
     process.exit(0);
   }
@@ -87,4 +91,7 @@ function main() {
   process.exit(postCodexTrigger(prNumber, args.dryRun));
 }
 
-main();
+try { main(); } catch (error) {
+  console.error(`request-codex-review: ${error.message}`);
+  process.exitCode = 1;
+}

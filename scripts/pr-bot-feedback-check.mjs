@@ -86,7 +86,7 @@ function main() {
   const args = parseArgs(process.argv);
   if (args.help) {
     console.log(
-      'Usage: node scripts/pr-bot-feedback-check.mjs [--pr N] [--audit-merged] [--limit N] [--json] [--skip-bot-presence] [--require-bots gemini,codex,sourcery]',
+      'Usage: node scripts/pr-bot-feedback-check.mjs [--pr N] [--audit-merged] [--limit N] [--json] [--skip-bot-presence] [--require-bots list|off]',
     );
     process.exit(0);
   }
@@ -167,4 +167,9 @@ function main() {
   process.exit(result.violations.length ? 1 : 0);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  console.error(`pr-bot-feedback-check: GitHub API check could not complete: ${error.message}`);
+  process.exit(2);
+}

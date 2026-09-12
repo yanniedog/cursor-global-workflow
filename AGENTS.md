@@ -2,6 +2,8 @@
 
 Installed to `~/.cursor/skills/` by `install.ps1` / `install.sh`. Per-repo copies are optional.
 
+The global sync contract also applies to `codex-cloud/` and `scripts/bootstrap-codex-cloud.ps1`. Keep these files portable, secret-free, and usable from Linux Cloud containers.
+
 ## Global sync contract (no drift)
 
 **Public repo:** [github.com/yanniedog/cursor-global-workflow](https://github.com/yanniedog/cursor-global-workflow)
@@ -49,12 +51,19 @@ Installed to `~/.cursor/workflow-scripts/`; env `CURSOR_WORKFLOW_SCRIPTS` points
 | `chief:scan` | `chief-scan.mjs` |
 | `pr:bot-feedback-check` | `pr-bot-feedback-check.mjs` |
 | `pr:gates:check` | `pr-gates-check.mjs` |
+| `pr:arm-and-park` | `pr-arm-and-park.mjs` |
 | `pr:watch-once` | `pr-watch-once.mjs` |
 | `pr:queue:drive` | `pr-queue-drive.mjs` |
 | `pr:update-branch` | `pr-update-branch.mjs` |
 | `pr:merge` | `pr-merge.mjs` |
 | `ship:closeout:strict` | `ship-closeout-strict.mjs` |
 | `agent:auditor` | `agent-auditor-scan.mjs` |
+
+Review vendors and Qwen/local-LLM are advisory. New repositories are created
+with `npm run repo:create:standard`; this installs deterministic CI plus the
+required feedback gate and applies GitHub protection/merge settings. Do not
+bootstrap Qwen or `bot-presence-gate` as required checks. The legacy Qwen setup
+guide is retained only for an explicit owner opt-in.
 
 Wire these in each repo's `package.json` (see README tier 2).
 
@@ -76,3 +85,12 @@ Copy `templates/project.json.example` → `YOUR_REPO/.cursor/project.json`:
 ## Ship bar
 
 Copy `WORKFLOW.md` template to repo root; fill `{PROJECT_NAME}`, `{VERIFY_COMMAND}`, `{DEPLOY_COMMAND}`, `{DEPLOY_URL}`.
+
+## Cursor Cloud specific instructions
+
+This repository contains Node.js ESM command-line tools and portable Cloud setup scripts. It declares no npm dependencies; use the checked-in Node scripts directly. An authenticated `gh` CLI is needed for live GitHub operations. Do not assume authentication is preconfigured.
+
+- Syntax check: `find scripts -name '*.mjs' -exec node --check {} \;`.
+- Deterministic verification: `npm run pr:merge:verify`, `npm run pr:arm-and-park:verify`, and `npm run review-gates:verify`.
+- Live audit commands can return nonzero for real pending or failing merge gates. Follow `WORKFLOW.md` and use one-shot checks; do not start polling loops.
+- For Linux setup and maintenance, follow `codex-cloud/README.md`. Windows PowerShell scripts require Windows; use the documented portable equivalents in Cloud.
