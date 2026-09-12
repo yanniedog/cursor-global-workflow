@@ -43,7 +43,7 @@ export function isReviewablePath(filePath) {
   ) return false;
   return (
     /\.(?:[cm]?[jt]sx?|json|ya?ml|gradle|properties|xml|kt|java|sh|ps1|py|go|rs|c|cc|cpp|h|hpp|swift|tf|sql|rb|php|vue|svelte|css|html)$/i.test(path) ||
-    /(^|\/)(?:Dockerfile|Podfile|[^/]+\.Modelfile)$/i.test(path)
+    /(^|\/)(?:Dockerfile|Podfile|Makefile|Jenkinsfile|CMakeLists\.txt|\.gitmodules|\.gitattributes|\.gitignore|[^/]+\.Modelfile)$/i.test(path)
   );
 }
 
@@ -89,9 +89,8 @@ export function collectDiff(baseRef, maxChars) {
   // checkout fetch-depth: 0 supplies the base without retaining credentials.
   runGit(['rev-parse', '--verify', `refs/remotes/origin/${baseRef}`]);
   const range = `origin/${baseRef}...HEAD`;
-  const changedFiles = runGit(['diff', '--name-only', '--diff-filter=ACDMRTUXB', range])
-    .split(/\r?\n/)
-    .map((value) => value.trim())
+  const changedFiles = runGit(['diff', '--name-only', '-z', '--diff-filter=ACDMRTUXB', range])
+    .split('\0')
     .filter(Boolean);
   const candidates = changedFiles
     .filter(isReviewablePath)

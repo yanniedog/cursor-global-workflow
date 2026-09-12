@@ -434,7 +434,9 @@ async function main() {
   }
   let state = readState(prNumber) || {};
   const anchorFromPr = resolved.pr.createdAt;
-  const anchorFromHead = resolved.pr.updatedAt || anchorFromPr;
+  // Head identity scopes Qwen reviews; PR-wide updatedAt includes unrelated comments.
+  // Retain all potentially valid reviews when migrating or switching heads.
+  const anchorFromHead = anchorFromPr;
 
   if (args.botTag) {
     const anchorIso = new Date().toISOString();
@@ -447,6 +449,10 @@ async function main() {
     state.anchor = args.since;
     state.headSha = headSha;
     state.readyAt = null;
+    state.requiredKeys = requiredKeys;
+    writeState(prNumber, state);
+  } else if (!state.headSha && state.anchor && new Date(state.anchor) >= new Date(anchorFromPr)) {
+    state.headSha = headSha;
     state.requiredKeys = requiredKeys;
     writeState(prNumber, state);
   } else if (state.headSha !== headSha) {
