@@ -6,6 +6,7 @@
  * and the quiet window are also enforced.
  * Exit 2 = still waiting; exit 1 = error or an explicit requirement timed out.
  */
+import { isBotNoise } from './lib/bot-noise.mjs';
 import { fetchReviewHistory } from './lib/pr-review-history.mjs';
 import { execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -280,7 +281,7 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
   if (activity.error) return { status: 'error', message: activity.error };
 
   const anchorMs = anchor.getTime();
-  const botEventsSinceAnchor = activity.events.filter(
+  const botEventsSinceAnchor = activity.events.filter(e => !isBotNoise(e.body)).filter(
     (e) => isKnownBotLogin(e.login, knownBots) && new Date(e.at).getTime() >= anchorMs,
   );
   const seenLogins = [...new Set(botEventsSinceAnchor.map((e) => e.login))];

@@ -33,17 +33,17 @@ gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen2.5-coder-review:7b'
 ## Workflow behavior
 
 - Uses `pull_request_target` so the workflow definition, reviewer script, prompt,
-  and repository policy are loaded from protected `main`.
+  and repository policy are loaded from the protected default branch.
 - Checks out the PR head separately with no persisted credentials and treats it
   only as diff data; PR-controlled code is never executed on the private runner.
 - Triggers on PR `opened`, `synchronize`, `reopened`, `ready_for_review`.
-- Triggers on PR comments containing `@qwen-review` (force re-review).
+- Triggers on PR comments containing `@qwen-review` from owners, members, or collaborators (force re-review, including bot-authored PRs).
 - Reads fork heads through the base repository's pull ref without granting the
   fork a token or executing any PR-controlled code.
 - Posts a new formal review for each head with `<!-- qwen-code-review -->`, the
   exact reviewed commit, outcome, model, file coverage, and workflow URL.
 - Reviews every reviewable file in bounded 12,000-character chunks. If the
-  160,000-character whole-PR budget would omit a reviewable file, the run fails
+  12,000-character individual-file or 160,000-character whole-PR budget would omit a reviewable file, the run fails
   instead of publishing a partial success. Generated, lock, documentation, and
   asset files are reported separately as intentional low-signal exclusions.
 - Publishes the current-head check run `qwen-code-review`; failed reviews remain
@@ -57,7 +57,7 @@ gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen2.5-coder-review:7b'
 npm run wait-for-bots -- --bot-tag
 ```
 
-Required bots default: `gemini,codex,sourcery,qwen`.
+Review vendors are advisory by default; required reviewer presence defaults to off. Qwen installation is an explicit owner opt-in and is not part of default repository bootstrap.
 
 ## Troubleshooting
 

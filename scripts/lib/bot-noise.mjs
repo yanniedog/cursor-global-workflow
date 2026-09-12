@@ -22,25 +22,13 @@
  */
 
 const QUOTA_PATTERNS = [
-  /\brate[\s-]?limit(?:ed)?\b/i,
-  /\bapi (?:limit|quota)\b/i,
-  /\bquota (?:exceeded|reached|exhausted)\b/i,
-  /\bout of (?:credits?|tokens?|quota|usage)\b/i,
-  /\binsufficient (?:credits?|tokens?|funds|balance|quota)\b/i,
-  /\bsubscription (?:required|expired)\b/i,
-  /\btrial (?:expired|ended|has expired)\b/i,
-  /\b(?:monthly|daily) (?:limit|quota)\b/i,
-  /\bfree[\s-]tier (?:limit|quota)\b/i,
-  /\bservice (?:temporarily )?unavailable\b/i,
-  /\btoo many requests\b/i,
-  /\b429\b/,
-  /\bplease (?:try|come back) (?:again )?later\b/i,
-  /couldn'?t (?:review|process|complete)/i,
-  /unable to (?:review|process|complete)/i,
+  /^\s*(?:>\s*)?(?:#{1,6}\s*)?(?:review )?rate[ -]limit(?:ed| reached| exceeded)?[.!\s]*$/im,
+  /(?:couldn.t|cannot|unable to|failed to)\s+(?:review|process|complete)\b/i,
+  /\b(?:your|our|we(?:.ve| have) (?:hit|reached))\b[^\n]{0,70}\b(?:quota|limit|credits|trial)\b/i,
+  /^\s*(?:ERROR:|Review outcome:\s*failed\b)/im,
   /\breview activity has ceased\b/i,
   /\bconsumer version (?:has been )?(?:sunset|retired|deprecated)\b/i,
   /\bdid not complete successfully\b/i,
-  /^\s*ERROR:/i,
 ];
 
 const TRIVIAL_PATTERNS = [
@@ -58,6 +46,7 @@ export function isQuotaBotMessage(bodyRaw) {
   if (!bodyRaw) return false;
   const body = String(bodyRaw).trim();
   if (!body) return false;
+  if (/^Review outcome:\s*(?:completed|no findings|findings)\s*$/im.test(body)) return false;
   return QUOTA_PATTERNS.some((re) => re.test(body));
 }
 

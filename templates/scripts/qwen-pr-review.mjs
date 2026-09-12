@@ -86,7 +86,8 @@ export function changedLinesFromDiff(diffText) {
 }
 
 export function collectDiff(baseRef, maxChars) {
-  runGit(['fetch', '--no-tags', 'origin', baseRef]);
+  // checkout fetch-depth: 0 supplies the base without retaining credentials.
+  runGit(['rev-parse', '--verify', `refs/remotes/origin/${baseRef}`]);
   const range = `origin/${baseRef}...HEAD`;
   const changedFiles = runGit(['diff', '--name-only', '--diff-filter=ACDMRTUXB', range])
     .split(/\r?\n/)

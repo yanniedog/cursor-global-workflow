@@ -86,8 +86,9 @@ jobs:
         env:
           AUTHOR: ${{ steps.pr.outputs.author }}
           AUTHOR_TYPE: ${{ steps.pr.outputs.author_type }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          $isBot = $env:AUTHOR_TYPE -eq 'Bot' -or $env:AUTHOR.EndsWith('[bot]')
+          $isBot = $env:EVENT_NAME -eq 'pull_request_target' -and ($env:AUTHOR_TYPE -eq 'Bot' -or $env:AUTHOR.EndsWith('[bot]'))
           "value=$($isBot.ToString().ToLowerInvariant())" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Check existing current-head result
