@@ -175,6 +175,9 @@ Copy CI workflow:
 
 ```sh
 cp workflows/pr-bot-feedback-check.yml YOUR_REPO/.github/workflows/
+# Optional: install the companion request-codex-review.mjs and its lib dependencies first.
+cp workflows/pr-request-bot-reviews.yml YOUR_REPO/.github/workflows/
+# Reviewer presence remains off by default.
 ```
 
 Copy hook stub:
