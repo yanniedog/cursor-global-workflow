@@ -98,7 +98,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
-          $id = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA/check-runs" `
+          $id = gh api --paginate "repos/$env:GITHUB_REPOSITORY/commits/$env:HEAD_SHA/check-runs?per_page=100" `
             --jq '.check_runs[] | select(.name=="qwen-code-review" and .conclusion=="success") | .id' |
             Select-Object -First 1
           $exists = [bool]$id

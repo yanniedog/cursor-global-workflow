@@ -6,7 +6,7 @@ const diff = '--- a/a.cpp\n+++ b/a.cpp\n@@ -4,2 +4,3 @@\n---index;\n+++index;\n\
 const lines = changedLinesFromDiff(diff);
 assert.deepEqual([...lines.left], [4]);
 assert.deepEqual([...lines.right], [4, 5]);
-for (const path of ['src/a.py', 'main.go', 'lib.rs', 'a.cpp', 'a.swift', 'a.tf', 'a.sql']) assert.ok(isReviewablePath(path));
+for (const path of ['src/a.py', 'main.go', 'lib.rs', 'a.cpp', 'a.swift', 'a.tf', 'a.sql', 'Makefile', 'Jenkinsfile', 'CMakeLists.txt', '.gitmodules', 'src/café.py']) assert.ok(isReviewablePath(path));
 for (const path of ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'Cargo.lock', 'poetry.lock']) assert.equal(isReviewablePath(path), false);
 assert.equal(isTrivialBotMessage('SQL injection in query'), false);
 assert.equal(normalizeFindings([{path:'a.cpp', line:4, side:'RIGHT', severity:'high', issue:'Overflow', suggested_fix:'Bound it'}], {reviewedFiles:['a.cpp'], validLines:new Map([['a.cpp',lines]])}).length, 1);
