@@ -1,0 +1,39 @@
+name: pr-request-bot-reviews
+
+# Optional owner-installed workflow. Runs only trusted default-branch code.
+on:
+  pull_request_target:
+    types: [opened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+concurrency:
+  group: pr-request-bot-reviews-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: false
+jobs:
+  request-codex-review:
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.pull_request != null && github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Request Codex review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: node scripts/request-codex-review.mjs --pr "$PR"
