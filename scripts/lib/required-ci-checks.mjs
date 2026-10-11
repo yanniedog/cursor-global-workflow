@@ -3,8 +3,8 @@ import { readCheckResult, selectLatestChecks } from './pr-check-history.mjs';
 
 export const DEFAULT_REQUIRED_CHECKS = ['bot-feedback-gate'];
 
-function runGhJson(args) {
-  const result = spawnSync('gh', args, {
+function runGhJson(args, ghRunner = spawnSync) {
+  const result = ghRunner('gh', args, {
     encoding: 'utf8',
     timeout: 120_000,
     maxBuffer: 8 * 1024 * 1024,
@@ -246,13 +246,13 @@ function encodeRef(value) {
   return encodeURIComponent(String(value || 'main'));
 }
 
-function policyForBranch(repo, baseRefName, fallbackRequiredNames) {
+function policyForBranch(repo, baseRefName, fallbackRequiredNames, ghRunner) {
   const branch = encodeRef(baseRefName);
   const protection = runGhJson([
     'api',
     `repos/${repo}/branches/${branch}/protection`,
-  ]);
-  const rules = runGhJson(['api', `repos/${repo}/rules/branches/${branch}`]);
+  ], ghRunner);
+  const rules = runGhJson(['api', `repos/${repo}/rules/branches/${branch}`], ghRunner);
   return combineRequiredCheckState({
     protectionOk: protection.ok,
     protection: protection.data,
@@ -262,8 +262,8 @@ function policyForBranch(repo, baseRefName, fallbackRequiredNames) {
   });
 }
 
-function prRequiredChecks(prNumber) {
-  const result = spawnSync(
+function prRequiredChecks(prNumber, ghRunner = spawnSync) {
+  const result = ghRunner(
     'gh',
     [
       'pr',
@@ -293,18 +293,19 @@ export function fetchRequiredCheckState({
   baseRefName = 'main',
   ignoredNames = [],
   fallbackRequiredNames = DEFAULT_REQUIRED_CHECKS,
+  ghRunner = spawnSync,
 }) {
-  const policy = policyForBranch(repo, baseRefName, fallbackRequiredNames);
-  const prChecks = prRequiredChecks(prNumber);
+  const policy = policyForBranch(repo, baseRefName, fallbackRequiredNames, ghRunner);
+  const prChecks = prRequiredChecks(prNumber, ghRunner);
   if (prChecks.ambiguous) return { error: prChecks.error, policySource: policy.source };
   const checkRuns = runGhJson([
     'api',
     `repos/${repo}/commits/${headSha}/check-runs?per_page=100`,
-  ]);
+  ], ghRunner);
   const statuses = runGhJson([
     'api',
     `repos/${repo}/commits/${headSha}/status?per_page=100`,
-  ]);
+  ], ghRunner);
 
   const evaluated = evaluateRequiredCheckState({
     requiredChecks: uniqueRequiredChecks([
