@@ -1,16 +1,15 @@
 name: pr-bot-presence-gate
 
 # Advisory-only compatibility workflow. Keep disabled in repository Actions
-# settings unless an owner explicitly opts into reviewer-presence waiting.
+# settings unless an owner explicitly dispatches it and opts into reviewers.
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  pull_request_review:
-    types: [submitted]
-  issue_comment:
-    types: [created]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,7 +17,6 @@ permissions:
 
 jobs:
   bot-presence-gate:
-    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -33,12 +31,16 @@ jobs:
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           sudo apt update
           sudo apt install gh -y
-      - name: Required bot wait gate
+      - name: Optional reviewer presence check
         env:
+          PR: ${{ inputs.pr_number }}
           GH_TOKEN: ${{ github.token }}
           BOT_WAIT_REQUIRED: ${{ vars.BOT_WAIT_REQUIRED || 'off' }}
           BOT_WAIT_IGNORE_CHECK_NAMES: bot-presence-gate,pr-bot-feedback-check,required-bot-wait,qwen-code-review,cursor-auto-review
         run: |
+          if [ "$BOT_WAIT_REQUIRED" = "off" ]; then
+            echo "Reviewer presence is advisory; no vendors explicitly required."
+            exit 0
+          fi
           SCRIPT="${CURSOR_WORKFLOW_SCRIPTS:-./scripts}/wait_for_bots.mjs"
-          PR="${{ github.event.pull_request.number || github.event.issue.number }}"
           node "$SCRIPT" --watch --pr "$PR"
