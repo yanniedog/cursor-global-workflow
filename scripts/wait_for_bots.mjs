@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { writeJsonAtomically } from './lib/bot-wait-state.mjs';
+import { writeJsonAtomically, readJsonState } from './lib/bot-wait-state.mjs';
 import { fetchRequiredCi } from './lib/pr-gates-lib.mjs';
 import { requiredCiWaitResult, applyReviewerPolicy, reviewWaitIgnoredChecks } from './lib/bot-wait-ci.mjs';
 /**
@@ -118,7 +118,7 @@ function readState(prNumber) {
   const p = statePath(prNumber);
   if (!fs.existsSync(p)) return null;
   try {
-    return JSON.parse(fs.readFileSync(p, 'utf8'));
+    return readJsonState(p);
   } catch {
     return null;
   }
@@ -431,7 +431,7 @@ async function main() {
 
   if (args.botTag) {
     const anchorIso = new Date().toISOString();
-    state = { anchor: anchorIso, readyAt: null, requiredKeys, headSha, waitStartedAt: state.waitStartedAt };
+    Object.assign(state, { anchor: anchorIso, readyAt: null, requiredKeys, headSha, waitStartedAt: state.waitStartedAt });
     persistWaitState();
     console.log(`>>> BOT WAIT: anchor reset (bot-tag) at ${anchorIso} for PR #${prNumber}`);
     console.log(`>>> Required: ${formatRequiredKeys(requiredKeys)}`);
