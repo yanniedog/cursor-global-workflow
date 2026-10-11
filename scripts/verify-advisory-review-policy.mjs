@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { writeBotWaitStateFile, readBotWaitStateFile, botWaitStatePath } from './lib/bot-wait-state.mjs';
 import { parseRequiredKeys, resolveRequiredKeys } from './lib/bot-wait-config.mjs';
-import { requiredCiWaitResult, applyReviewerPolicy } from './lib/bot-wait-ci.mjs';
+import { requiredCiWaitResult, applyReviewerPolicy, reviewWaitIgnoredChecks } from './lib/bot-wait-ci.mjs';
 import { BOT_GATE_CHECK_NAMES } from './lib/pr-gates-lib.mjs';
 import { checkRequiredBotsOnPr } from './lib/bot-wait-presence.mjs';
 assert.deepEqual(parseRequiredKeys(''), []);
@@ -29,6 +29,7 @@ try {
   assert.deepEqual(persisted.requiredKeys, []);
   assert.equal(persisted.readyAt, null);
   assert.deepEqual(applyReviewerPolicy(persisted, ['sourcery']), ['sourcery']);
+  assert.deepEqual(persisted.requiredKeys, ['sourcery']);
   const accepted = fs.readFileSync(botWaitStatePath(123, stateRoot), 'utf8');
   const originalRename = fs.renameSync;
   try {
@@ -53,3 +54,6 @@ assert.equal(requiredCiWaitResult({ ok: true, pending: true, failed: false }).st
 assert.equal(requiredCiWaitResult({ ok: true, pending: true, failed: true, failedNames: ['product-ci'] }).status, 'error');
 assert.equal(requiredCiWaitResult({ ok: false, error: 'auth failed' }).status, 'error');
 console.log('Advisory review policy regression tests passed');
+
+assert.ok(reviewWaitIgnoredChecks().has('bot-feedback-gate'));
+assert.ok(reviewWaitIgnoredChecks('UNIT-CHECK').has('unit-check'));
