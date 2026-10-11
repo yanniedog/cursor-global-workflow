@@ -25,6 +25,6 @@
     "pr:watch-once": "node scripts/pr-watch-once.mjs",
     "pr:queue:drive": "node scripts/pr-queue-drive.mjs",
     "pr:update-branch": "node scripts/pr-update-branch.mjs",
-    "pr:check-history:verify": "node scripts/verify-pr-check-history.mjs"
+    "pr:check-history:verify": "node scripts/verify-pr-check-history.mjs && node scripts/verify-required-history-fallback.mjs"
   }
 }
