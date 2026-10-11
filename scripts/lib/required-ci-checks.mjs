@@ -275,7 +275,7 @@ function prRequiredChecks(prNumber, ghRunner = spawnSync, ignoredNames = []) {
     { encoding: 'utf8', timeout: 120_000 },
   );
   const parsed = readCheckResult(result);
-  if (parsed.error) return { ok: false, error: parsed.error };
+  if (parsed.error) return { ok: false, error: parsed.error, ambiguous: Boolean(result.stdout?.trim()) };
   const relevant = parsed.checks.filter((row) => !ignoredNames.some((name) => nameMatches(row?.name, name)));
   const latest = selectLatestChecks(relevant);
   if (latest.error) return { ok: false, error: latest.error, ambiguous: true };
