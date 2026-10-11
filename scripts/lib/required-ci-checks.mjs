@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readCheckResult, selectLatestChecks } from './pr-check-history.mjs';
 
 export const DEFAULT_REQUIRED_CHECKS = ['bot-feedback-gate'];
 
@@ -270,23 +271,15 @@ function prRequiredChecks(prNumber) {
       String(prNumber),
       '--required',
       '--json',
-      'name,bucket,state,startedAt,completedAt',
+      'name,bucket,state,startedAt,completedAt,workflow,link',
     ],
     { encoding: 'utf8', timeout: 120_000 },
   );
-  if (result.error) return { ok: false, error: result.error.message };
-  if (result.status === 0 || result.status === 8) {
-    try {
-      return { ok: true, data: JSON.parse((result.stdout || '').trim() || '[]') };
-    } catch (error) {
-      return { ok: false, error: `Invalid JSON from gh pr checks: ${error.message}` };
-    }
-  }
-  const error = (result.stderr || result.stdout || `gh exit ${result.status}`).trim();
-  if (/no required checks reported/i.test(error) || /no checks reported/i.test(error)) {
-    return { ok: true, data: [] };
-  }
-  return { ok: false, error, status: result.status };
+  const parsed = readCheckResult(result);
+  if (parsed.error) return { ok: false, error: parsed.error };
+  const latest = selectLatestChecks(parsed.checks);
+  if (latest.error) return { ok: false, error: latest.error };
+  return { ok: true, data: latest.checks };
 }
 
 /**
