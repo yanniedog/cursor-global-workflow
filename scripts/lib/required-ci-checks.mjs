@@ -200,12 +200,11 @@ export function evaluateRequiredCheckState({
   headCheckRuns = [],
   commitStatuses = [],
 }) {
-  const ignored = new Set(ignoredNames.map(normalizedName));
   const requirements = uniqueRequiredChecks(
     requiredChecks?.length
       ? requiredChecks
       : (requiredNames || []).map((name) => asRequiredCheck(name)).filter(Boolean),
-  ).filter((row) => !ignored.has(normalizedName(row.context)));
+  ).filter((row) => !ignoredNames.some((name) => nameMatches(row.context, name)));
   const observations = [
     ...(prChecks || []),
     ...(headCheckRuns || []),
@@ -262,7 +261,7 @@ function policyForBranch(repo, baseRefName, fallbackRequiredNames, ghRunner) {
   });
 }
 
-function prRequiredChecks(prNumber, ghRunner = spawnSync) {
+function prRequiredChecks(prNumber, ghRunner = spawnSync, ignoredNames = []) {
   const result = ghRunner(
     'gh',
     [
@@ -277,7 +276,8 @@ function prRequiredChecks(prNumber, ghRunner = spawnSync) {
   );
   const parsed = readCheckResult(result);
   if (parsed.error) return { ok: false, error: parsed.error };
-  const latest = selectLatestChecks(parsed.checks);
+  const relevant = parsed.checks.filter((row) => !ignoredNames.some((name) => nameMatches(row?.name, name)));
+  const latest = selectLatestChecks(relevant);
   if (latest.error) return { ok: false, error: latest.error, ambiguous: true };
   return { ok: true, data: latest.checks };
 }
@@ -296,7 +296,7 @@ export function fetchRequiredCheckState({
   ghRunner = spawnSync,
 }) {
   const policy = policyForBranch(repo, baseRefName, fallbackRequiredNames, ghRunner);
-  const prChecks = prRequiredChecks(prNumber, ghRunner);
+  const prChecks = prRequiredChecks(prNumber, ghRunner, ignoredNames);
   if (prChecks.ambiguous) return { error: prChecks.error, policySource: policy.source };
   const checkRuns = runGhJson([
     'api',
