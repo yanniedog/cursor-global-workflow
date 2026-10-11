@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { fetchRequiredCi } from './lib/pr-gates-lib.mjs';
+import { requiredCiWaitResult } from './lib/bot-wait-ci.mjs';
 /**
  * Dynamic pre-merge settlement gate (WORKFLOW.md step 5).
  * Reviewers are advisory by default, so exit 0 means required CI has settled.
@@ -256,23 +258,9 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
   const repo = repoIn || resolveRepo();
   if (!repo) return { status: 'error', message: 'Could not resolve repository (gh repo view).' };
 
+  if (requiredKeys.length === 0) return requiredCiWaitResult(fetchRequiredCi(prNumber));
   const checks = fetchChecks(prNumber);
-  if (checks.error && !checks.pending) {
-    return { status: 'error', message: checks.error };
-  }
-  if (requiredKeys.length === 0) {
-    return checks.pending
-      ? {
-          status: 'waiting',
-          message: `PR #${prNumber}: required CI checks still pending; reviewers are advisory.`,
-        }
-      : {
-          status: 'ready',
-          message: 'Required CI checks settled; reviewers are advisory.',
-          botsSeen: [],
-          missing: [],
-        };
-  }
+  if (checks.error && !checks.pending) return { status: 'error', message: checks.error };
 
   const knownBots = allKnownBotLogins(requiredKeys);
   const elapsedMs = elapsedHeadWait(state, anchor);
