@@ -96,7 +96,7 @@ export function resolvePrNumber(prArg) {
   return { pr: view, branch };
 }
 
-export function fetchRequiredCi(prNumber) {
+export function fetchRequiredCi(prNumber, { ignoredNames = [] } = {}) {
   let pr;
   let repo;
   try {
@@ -121,6 +121,7 @@ export function fetchRequiredCi(prNumber) {
     headSha: pr.headRefOid,
     baseRefName: pr.baseRefName,
     fallbackRequiredNames,
+    ignoredNames,
   });
   if (result.error) return { ok: false, error: result.error };
   return {
