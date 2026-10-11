@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { writeJsonAtomically } from './lib/bot-wait-state.mjs';
 import { fetchRequiredCi } from './lib/pr-gates-lib.mjs';
 import { requiredCiWaitResult, applyReviewerPolicy } from './lib/bot-wait-ci.mjs';
 /**
@@ -125,8 +126,7 @@ function readState(prNumber) {
 
 function writeState(prNumber, state) {
   const p = statePath(prNumber);
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  writeJsonAtomically(p, state);
 }
 
 function resolveRepo() {
@@ -504,7 +504,7 @@ async function main() {
 
   const runOnce = () => {
     const st = readState(prNumber) || state;
-    const keys = Array.isArray(st.requiredKeys) ? st.requiredKeys : effectiveRequired;
+    const keys = effectiveRequired;
     return evaluate({
       prNumber,
       anchorIso: st.anchor || anchorFromPr,

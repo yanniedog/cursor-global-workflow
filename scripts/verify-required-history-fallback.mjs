@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fetchRequiredCheckState } from './lib/required-ci-checks.mjs';
+import { fetchRequiredCheckState, evaluateRequiredCheckState } from './lib/required-ci-checks.mjs';
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'required-history-'));
 try {
   const row = { name: 'product-ci', workflow: 'ci', link: 'https://github.com/example/repo/actions/runs/1/job/2', bucket: 'pass', state: 'SUCCESS', startedAt: '2026-10-11T00:00:00Z' };
@@ -11,6 +11,12 @@ try {
   fs.writeFileSync(path.join(temp, 'fixture.mjs'), `const args=process.argv.slice(2);\nif(args[0]==='pr') {console.log(${JSON.stringify(JSON.stringify(fixtures))});process.exit(8);}\nif(args[1].includes('protection')||args[1].includes('/rules/')) {process.exit(1);}\nconsole.log(JSON.stringify({check_runs:[{name:'bot-feedback-gate',status:'completed',conclusion:'success'}],statuses:[]}));\n`, { mode: 0o755 });
   const result = fetchRequiredCheckState({ prNumber: 1, repo: 'example/repo', headSha: 'abc', ghRunner: (_command, args, options) => spawnSync(process.execPath, [path.join(temp, 'fixture.mjs'), ...args], options) });
   assert.match(result.error, /Cannot order duplicate check runs: product-ci/);
+  const ignored = fetchRequiredCheckState({ prNumber: 1, repo: 'example/repo', headSha: 'abc', ignoredNames: ['product-ci'], ghRunner: (_command, args, options) => spawnSync(process.execPath, [path.join(temp, 'fixture.mjs'), ...args], options) });
+  assert.equal(ignored.error, undefined);
+  assert.equal(ignored.pending, false);
+  assert.equal(ignored.failed, false);
+  assert.equal(evaluateRequiredCheckState({ requiredNames: ['workflow / self-gate'], ignoredNames: ['self-gate'] }).pending, false);
+
 } finally {
   fs.rmSync(temp, { recursive: true, force: true });
 }
