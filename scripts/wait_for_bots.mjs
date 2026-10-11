@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { writeJsonAtomically } from './lib/bot-wait-state.mjs';
 import { fetchRequiredCi } from './lib/pr-gates-lib.mjs';
-import { requiredCiWaitResult, applyReviewerPolicy } from './lib/bot-wait-ci.mjs';
+import { requiredCiWaitResult, applyReviewerPolicy, reviewWaitIgnoredChecks } from './lib/bot-wait-ci.mjs';
 /**
  * Dynamic pre-merge settlement gate (WORKFLOW.md step 5).
  * Reviewers are advisory by default, so exit 0 means required CI has settled.
@@ -197,13 +197,7 @@ function fetchBotActivity(owner, name, prNumber) {
 }
 
 function ignoredCheckNames() {
-  const raw = process.env.BOT_WAIT_IGNORE_CHECK_NAMES || '';
-  return new Set(
-    raw
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  return reviewWaitIgnoredChecks(process.env.BOT_WAIT_IGNORE_CHECK_NAMES);
 }
 
 /** Match full `gh pr checks` name or trailing job segment (e.g. `workflow / job`). */
