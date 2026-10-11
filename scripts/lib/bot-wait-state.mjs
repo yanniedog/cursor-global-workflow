@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { gitRepoRoot } from './workflow-paths.mjs';
@@ -41,7 +42,7 @@ export function readBotWaitStateFile(prNumber, repoRoot) {
   for (const p of candidates) {
     if (!fs.existsSync(p)) continue;
     try {
-      return JSON.parse(fs.readFileSync(p, 'utf8'));
+      return readJsonState(p);
     } catch {
       continue;
     }
@@ -55,24 +56,58 @@ export function readBotWaitStateFile(prNumber, repoRoot) {
  * @param {string} [repoRoot]
  */
 export function writeBotWaitStateFile(prNumber, state, repoRoot) {
-  const p = botWaitStatePath(prNumber, repoRoot);
-  writeJsonAtomically(p, state);
+  writeJsonAtomically(botWaitStatePath(prNumber, repoRoot), state);
 }
 
-/** A failed write or replacement leaves the previously accepted anchor intact. */
+const SNAPSHOT = Symbol('wait-state-snapshot');
+const fingerprint = (content) => createHash('sha256').update(content).digest('hex');
+
+/** Keep the read version outside JSON so callers can safely mutate their snapshot. */
+export function readJsonState(filename) {
+  const content = fs.readFileSync(filename, 'utf8');
+  const state = JSON.parse(content);
+  if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error('Invalid wait state');
+  Object.defineProperty(state, SNAPSHOT, { value: { filename: path.resolve(filename), fingerprint: fingerprint(content) }, writable: true, configurable: true });
+  return state;
+}
+
+/** Exclusive compare-and-swap rejects stale snapshots instead of replacing newer anchors. */
 export function writeJsonAtomically(destination, state) {
   fs.mkdirSync(path.dirname(destination), { recursive: true });
+  const lock = `${destination}.lock`;
+  let lockDescriptor;
+  try {
+    lockDescriptor = fs.openSync(lock, 'wx');
+  } catch (error) {
+    if (error.code === 'EEXIST') throw new Error('Wait state update is locked; retry after the writer exits');
+    throw error;
+  }
   const temporary = `${destination}.${process.pid}.${randomUUID()}.tmp`;
   try {
+    fs.writeFileSync(lockDescriptor, JSON.stringify({ pid: process.pid }));
+    const actual = fs.existsSync(destination) ? fingerprint(fs.readFileSync(destination, 'utf8')) : null;
+    const snapshot = state[SNAPSHOT];
+    const expected = snapshot?.filename === path.resolve(destination) ? snapshot.fingerprint : null;
+    if (actual !== expected) throw new Error('Wait state changed since read; reread before updating');
+    const content = `${JSON.stringify(state, null, 2)}\n`;
     const descriptor = fs.openSync(temporary, 'wx');
     try {
-      fs.writeFileSync(descriptor, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+      fs.writeFileSync(descriptor, content, 'utf8');
       fs.fsyncSync(descriptor);
     } finally {
       fs.closeSync(descriptor);
     }
     fs.renameSync(temporary, destination);
+    Object.defineProperty(state, SNAPSHOT, { value: { filename: path.resolve(destination), fingerprint: fingerprint(content) }, writable: true, configurable: true });
+    // Node cannot open directory descriptors on Windows; file fsync plus atomic
+    // replacement remains the portable guarantee there. POSIX also persists rename.
+    if (process.platform !== 'win32') {
+      const directory = fs.openSync(path.dirname(destination), 'r');
+      try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
+    }
   } finally {
     if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+    fs.closeSync(lockDescriptor);
+    fs.unlinkSync(lock);
   }
 }

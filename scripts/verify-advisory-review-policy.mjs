@@ -34,12 +34,27 @@ try {
   const originalRename = fs.renameSync;
   try {
     fs.renameSync = () => { throw new Error('replacement interrupted'); };
-    assert.throws(() => writeBotWaitStateFile(123, { anchor: 'new' }, stateRoot), /replacement interrupted/);
+    const attempt = readBotWaitStateFile(123, stateRoot);
+    attempt.anchor = 'new';
+    assert.throws(() => writeBotWaitStateFile(123, attempt, stateRoot), /replacement interrupted/);
   } finally {
     fs.renameSync = originalRename;
   }
   assert.equal(fs.readFileSync(botWaitStatePath(123, stateRoot), 'utf8'), accepted);
   assert.deepEqual(fs.readdirSync(path.dirname(botWaitStatePath(123, stateRoot))), ['123.json']);
+  const older = readBotWaitStateFile(123, stateRoot);
+  const newer = readBotWaitStateFile(123, stateRoot);
+  newer.anchor = '2030-01-01T00:00:00Z';
+  writeBotWaitStateFile(123, newer, stateRoot);
+  assert.throws(() => writeBotWaitStateFile(123, older, stateRoot), /changed since read/);
+  assert.equal(readBotWaitStateFile(123, stateRoot).anchor, newer.anchor);
+  const lockPath = `${botWaitStatePath(123, stateRoot)}.lock`;
+  fs.writeFileSync(lockPath, 'another writer');
+  try {
+    assert.throws(() => writeBotWaitStateFile(123, newer, stateRoot), /update is locked/);
+  } finally {
+    fs.unlinkSync(lockPath);
+  }
   // Return before attempting GitHub access even with stale saved keys.
   assert.equal(checkRequiredBotsOnPr('invalid', 'invalid', 123, { repoRoot: stateRoot }).ok, true);
   assert.equal(checkRequiredBotsOnPr('invalid', 'invalid', 123, { requiredKeys: [], repoRoot: stateRoot }).ok, true);
