@@ -278,7 +278,7 @@ function prRequiredChecks(prNumber) {
   const parsed = readCheckResult(result);
   if (parsed.error) return { ok: false, error: parsed.error };
   const latest = selectLatestChecks(parsed.checks);
-  if (latest.error) return { ok: false, error: latest.error };
+  if (latest.error) return { ok: false, error: latest.error, ambiguous: true };
   return { ok: true, data: latest.checks };
 }
 
@@ -296,6 +296,7 @@ export function fetchRequiredCheckState({
 }) {
   const policy = policyForBranch(repo, baseRefName, fallbackRequiredNames);
   const prChecks = prRequiredChecks(prNumber);
+  if (prChecks.ambiguous) return { error: prChecks.error, policySource: policy.source };
   const checkRuns = runGhJson([
     'api',
     `repos/${repo}/commits/${headSha}/check-runs?per_page=100`,
