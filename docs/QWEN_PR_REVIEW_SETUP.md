@@ -10,7 +10,7 @@ This matches the simjury `pr-local-llm-review` pattern (`runs-on: [self-hosted, 
    `ollama create qwen2.5-coder-review:7b -f scripts/qwen-review.Modelfile`.
    This pins an 8,192-token context instead of relying on Ollama's
    hardware-derived default.
-2. Self-hosted runner registered to the repo with label **`qwen-local-llm`** (example: `C:\actions-runner-cgw`, agent `surface-laptop-5-qwen-cgw`).
+2. Self-hosted runner registered to the repo with label **`qwen-local-llm`**.
 3. Runner process online (`gh api repos/<owner>/<repo>/actions/runners`).
 
 ## Secrets (optional on self-hosted)
@@ -63,7 +63,7 @@ Review vendors are advisory by default; required reviewer presence defaults to o
 
 | Symptom | Fix |
 |---------|-----|
-| Job queued forever | Start runner: `C:\actions-runner-cgw\run.cmd`; confirm label `qwen-local-llm` |
+| Job queued forever | Start the self-hosted runner and confirm label `qwen-local-llm` |
 | Connection refused | Ensure Ollama is running (`ollama list`, port 11434) |
 | Slow / timeout | Keep Ollama warm and confirm no larger model is consuming the CPU runner |
 | Review reports `Operation not allowed` | Recreate `qwen2.5-coder-review:7b` from the checked-in Modelfile and confirm `ollama ps` shows context `8192` |

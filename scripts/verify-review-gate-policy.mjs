@@ -29,9 +29,11 @@ assert.deepEqual(
       { login: 'sourcery-ai[bot]', body: 'Sorry, I could not review this pull request — rate limit' },
     ],
   ),
-  ['codex', 'qwen'],
+  ['codex'],
 );
 assert.deepEqual(blockingMissingRequiredKeys(['gemini'], []), []);
+assert.deepEqual(blockingMissingRequiredKeys(['qwen'], []), []);
+assert.deepEqual(blockingMissingRequiredKeys(['cursor'], []), []);
 assert.deepEqual(
   blockingMissingRequiredKeys(
     ['qwen'],
@@ -40,7 +42,7 @@ assert.deepEqual(
       body: '<!-- qwen-code-review -->\nReview outcome: findings\nReviewed commit: `abc`\nThe finding discusses HTTP 429 rate limit handling.',
     }],
   ),
-  ['qwen'],
+  [],
 );
 assert.deepEqual(
   blockingMissingRequiredKeys(
@@ -51,7 +53,7 @@ assert.deepEqual(
     }],
     { expectedHeadSha: 'bbbbbbb' },
   ),
-  ['qwen'],
+  [],
 );
 assert.deepEqual(
   blockingMissingRequiredKeys(
@@ -78,7 +80,10 @@ assert.deepEqual(parseRequiredKeys(undefined), []);
 assert.deepEqual(parseRequiredKeys('off'), []);
 assert.deepEqual(parseRequiredKeys('none'), []);
 assert.deepEqual(parseRequiredKeys('codex,coderabbit'), ['codex', 'coderabbit']);
-assert.deepEqual(resolveRequiredKeys([], 'codex'), []);
+assert.deepEqual(parseRequiredKeys('codex,qwen,sourcery'), ['codex', 'sourcery']);
+assert.deepEqual(parseRequiredKeys('qwen'), []);
+assert.deepEqual(resolveRequiredKeys(['codex', 'qwen', 'cursor'], 'sourcery'), ['codex']);
+assert.deepEqual(resolveRequiredKeys([], 'codex,qwen'), []);
 assert.equal(formatRequiredKeys([]), 'none (reviewers advisory)');
 assert.deepEqual(BOT_GATE_CHECK_NAMES, ['bot-feedback-gate']);
 

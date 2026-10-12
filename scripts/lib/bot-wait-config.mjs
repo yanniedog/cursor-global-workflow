@@ -126,47 +126,44 @@ function eventsForRequiredKey(key, events) {
   });
 }
 
-/**
- * Gemini absence, quota, and other non-substantive failures never block.
- * Codex, Sourcery, and Qwen still block when they have not posted. The same
- * nonsense failure from those reviewers does not block. Substantive Gemini
- * threads stay on the feedback gate.
- */
-function qwenEventsForHead(events, expectedHeadSha) {
-  if (!expectedHeadSha) return events;
-  const expected = String(expectedHeadSha).toLowerCase();
-  return events.filter((event) => {
-    const reviewed = reviewedCommitFromBody(event.body);
-    return Boolean(reviewed && (reviewed === expected || expected.startsWith(reviewed)));
-  });
+/** Qwen and the legacy cursor-auto-review key are the same optional reviewer. */
+const NEVER_REQUIRED_KEYS = new Set(['qwen', 'cursor']);
+
+export function omitNeverRequiredKeys(keys) {
+  return (keys || []).filter((key) => !NEVER_REQUIRED_KEYS.has(String(key || '').toLowerCase()));
 }
 
-export function blockingMissingRequiredKeys(missing, events, opts = {}) {
+/**
+ * Gemini absence, quota, and other non-substantive failures never block.
+ * Qwen, including a missing review, never blocks. Codex and Sourcery still
+ * block when they have not posted. The same nonsense failure from those
+ * reviewers does not block. Substantive Gemini threads stay on the feedback gate.
+ */
+export function blockingMissingRequiredKeys(missing, events) {
   return (missing || []).filter((key) => {
     const normalized = String(key || '').toLowerCase();
-    if (normalized === 'gemini') return false;
+    if (normalized === 'gemini' || NEVER_REQUIRED_KEYS.has(normalized)) return false;
     const related = eventsForRequiredKey(normalized, events);
-    const waiverEvents = normalized === 'qwen' || normalized === 'cursor'
-      ? qwenEventsForHead(related, opts.expectedHeadSha)
-      : related;
-    if (waiverEvents.length === 0) return true;
-    return !waiverEvents.every((event) => isReviewerNonsenseFailure(event.body));
+    if (related.length === 0) return true;
+    return !related.every((event) => isReviewerNonsenseFailure(event.body));
   });
 }
 
 export function parseRequiredKeys(raw) {
   if (!raw || !String(raw).trim()) return [...DEFAULT_REQUIRED_KEYS];
   if (/^(off|none|disabled)$/i.test(String(raw).trim())) return [];
-  return String(raw)
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+  return omitNeverRequiredKeys(
+    String(raw)
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
 }
 
 export function resolveRequiredKeys(argvKeys, envRaw) {
   // An explicitly supplied empty list means "off"; do not resurrect a saved
-  // or environment policy.
-  if (Array.isArray(argvKeys)) return argvKeys;
+  // or environment policy. Qwen cannot be reintroduced through argv or env.
+  if (Array.isArray(argvKeys)) return omitNeverRequiredKeys(argvKeys);
   const fromEnv = envRaw ?? process.env.AR_BOT_WAIT_REQUIRED ?? process.env.BOT_WAIT_REQUIRED ?? '';
   return parseRequiredKeys(fromEnv);
 }
