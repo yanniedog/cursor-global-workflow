@@ -21,6 +21,7 @@ import {
   formatRequiredKeys,
   isGeminiCodeReviewBody,
   isQwenCodeReviewBody,
+  blockingMissingRequiredKeys,
   missingRequiredKeysFromEvents,
   parseRequiredKeys,
   resolveRequiredKeys,
@@ -264,23 +265,24 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
   if (activity.error) return { status: 'error', message: activity.error };
 
   const anchorMs = anchor.getTime();
-  const botEventsSinceAnchor = activity.events.filter(e => !isBotNoise(e.body)).filter(
+  const knownEvents = activity.events.filter(
     (e) => isKnownBotLogin(e.login, knownBots) && new Date(e.at).getTime() >= anchorMs,
   );
+  const botEventsSinceAnchor = knownEvents.filter((e) => !isBotNoise(e.body));
   const seenLogins = [...new Set(botEventsSinceAnchor.map((e) => e.login))];
-  const missing = missingRequiredKeysFromEvents(requiredKeys, botEventsSinceAnchor, {
+  const unsatisfied = missingRequiredKeysFromEvents(requiredKeys, knownEvents, {
     expectedHeadSha,
   });
-  const allRequiredPosted =
-    requiredKeys.length > 0 && botEventsSinceAnchor.length > 0 && missing.length === 0;
+  const missing = blockingMissingRequiredKeys(unsatisfied, knownEvents);
+  const allRequiredPosted = missing.length === 0;
   const lastBotAt =
     botEventsSinceAnchor.length > 0
       ? new Date(botEventsSinceAnchor[botEventsSinceAnchor.length - 1].at)
       : null;
   const quiet =
     allRequiredPosted &&
-    lastBotAt !== null &&
-    Date.now() - lastBotAt.getTime() >= QUIET_WINDOW_SEC * 1000;
+    (lastBotAt === null ||
+      Date.now() - lastBotAt.getTime() >= QUIET_WINDOW_SEC * 1000);
 
 
   const checksReady = !checks.pending;

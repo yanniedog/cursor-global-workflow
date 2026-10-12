@@ -4,8 +4,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
+  blockingMissingRequiredKeys,
   DEFAULT_REQUIRED_KEYS,
   formatRequiredKeys,
+  missingRequiredKeysFromEvents,
   parseRequiredKeys,
   resolveRequiredKeys,
 } from './lib/bot-wait-config.mjs';
@@ -19,6 +21,27 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (path) => readFileSync(join(root, path), 'utf8');
 
 assert.deepEqual(DEFAULT_REQUIRED_KEYS, []);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    ['gemini', 'codex', 'sourcery', 'qwen'],
+    [
+      { login: 'gemini-code-assist[bot]', body: 'ERROR: Gemini API quota exceeded' },
+      { login: 'sourcery-ai[bot]', body: 'Sorry, I could not review this pull request — rate limit' },
+    ],
+  ),
+  ['codex', 'qwen'],
+);
+assert.deepEqual(blockingMissingRequiredKeys(['gemini'], []), []);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [{ login: 'chatgpt-codex-connector[bot]', body: 'This reachable branch drops the release artifact.' }],
+    ),
+    [{ login: 'chatgpt-codex-connector[bot]', body: 'This reachable branch drops the release artifact.' }],
+  ),
+  [],
+);
 assert.deepEqual(parseRequiredKeys(undefined), []);
 assert.deepEqual(parseRequiredKeys('off'), []);
 assert.deepEqual(parseRequiredKeys('none'), []);

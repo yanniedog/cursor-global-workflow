@@ -5,6 +5,7 @@ import {
   formatRequiredKeys,
   isGeminiCodeReviewBody,
   isQwenCodeReviewBody,
+  blockingMissingRequiredKeys,
   missingRequiredKeysFromEvents,
   resolveRequiredKeys,
 } from './bot-wait-config.mjs';
@@ -76,9 +77,12 @@ export function checkRequiredBotsOnPr(owner, name, prNumber, { requiredKeys, anc
   const anchor = anchorIso || pr.createdAt;
   const events = collectBotEvents(pr, knownBots, anchor);
   const seenLogins = [...new Set(events.map((e) => e.login))];
-  const missing = missingRequiredKeysFromEvents(keys, events, {
-    expectedHeadSha: pr.headRefOid,
-  });
+  const missing = blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(keys, events, {
+      expectedHeadSha: pr.headRefOid,
+    }),
+    events,
+  );
   return {
     requiredKeys: keys,
     anchor,
