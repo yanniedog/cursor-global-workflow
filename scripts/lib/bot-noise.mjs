@@ -46,6 +46,10 @@ const TRIVIAL_PATTERNS = [
  */
 export function looksLikeSubstantiveFinding(bodyRaw) {
   const text = String(bodyRaw || '');
+  if (/<!--\s*(?:qwen-code-review|cursor-auto-review)\s*-->/i.test(text)
+      && (/Review outcome:\s*failed/i.test(text) || /did not complete successfully/i.test(text))) {
+    return false;
+  }
   if (/```|!\[[^\]]*Badge\]|\bP[12] Badge\b/i.test(text)) return true;
   if (/\b(?:this|that) (?:branch|change|commit|function|method|path|handler|parser|retry path)\b/i.test(text)) return true;
   if (/\b(?:deletes|drops|mishandles)\b/i.test(text)) return true;

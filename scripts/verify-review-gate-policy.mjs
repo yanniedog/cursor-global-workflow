@@ -12,6 +12,7 @@ import {
   parseRequiredKeys,
   resolveRequiredKeys,
 } from './lib/bot-wait-config.mjs';
+import { isBotNoise } from './lib/bot-noise.mjs';
 import { BOT_GATE_CHECK_NAMES } from './lib/pr-gates-lib.mjs';
 import {
   combineRequiredCheckState,
@@ -64,6 +65,16 @@ assert.deepEqual(
   ),
   [],
 );
+const fencedQwenFailure = [
+  '<!-- qwen-code-review -->',
+  'Review outcome: failed',
+  'Qwen review did not complete successfully.',
+  '',
+  '```text',
+  'ERROR',
+  '```',
+].join('\n');
+assert.equal(isBotNoise(fencedQwenFailure), true);
 const codexPhraseFinding = 'The parser could not review an empty review body and this function should reject it.';
 assert.equal(
   eventSatisfiesRequiredKey('chatgpt-codex-connector[bot]', codexPhraseFinding, 'codex'),
