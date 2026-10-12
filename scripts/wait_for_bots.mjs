@@ -273,7 +273,9 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
   const unsatisfied = missingRequiredKeysFromEvents(requiredKeys, knownEvents, {
     expectedHeadSha,
   });
-  const missing = blockingMissingRequiredKeys(unsatisfied, knownEvents);
+  const missing = blockingMissingRequiredKeys(unsatisfied, knownEvents, {
+    expectedHeadSha,
+  });
   const allRequiredPosted = missing.length === 0;
   const lastBotAt =
     botEventsSinceAnchor.length > 0

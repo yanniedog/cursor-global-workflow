@@ -132,13 +132,25 @@ function eventsForRequiredKey(key, events) {
  * nonsense failure from those reviewers does not block. Substantive Gemini
  * threads stay on the feedback gate.
  */
-export function blockingMissingRequiredKeys(missing, events) {
+function qwenEventsForHead(events, expectedHeadSha) {
+  if (!expectedHeadSha) return events;
+  const expected = String(expectedHeadSha).toLowerCase();
+  return events.filter((event) => {
+    const reviewed = reviewedCommitFromBody(event.body);
+    return Boolean(reviewed && (reviewed === expected || expected.startsWith(reviewed)));
+  });
+}
+
+export function blockingMissingRequiredKeys(missing, events, opts = {}) {
   return (missing || []).filter((key) => {
     const normalized = String(key || '').toLowerCase();
     if (normalized === 'gemini') return false;
     const related = eventsForRequiredKey(normalized, events);
-    if (related.length === 0) return true;
-    return !related.every((event) => isReviewerNonsenseFailure(event.body));
+    const waiverEvents = normalized === 'qwen' || normalized === 'cursor'
+      ? qwenEventsForHead(related, opts.expectedHeadSha)
+      : related;
+    if (waiverEvents.length === 0) return true;
+    return !waiverEvents.every((event) => isReviewerNonsenseFailure(event.body));
   });
 }
 
