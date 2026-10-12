@@ -10,7 +10,7 @@ This matches the simjury `pr-local-llm-review` pattern (`runs-on: [self-hosted, 
    `ollama create qwen2.5-coder-review:7b -f scripts/qwen-review.Modelfile`.
    This pins an 8,192-token context instead of relying on Ollama's
    hardware-derived default.
-2. Self-hosted runner registered to the repo with label **`qwen-local-llm`** (example: `C:\actions-runner-cgw`, agent `surface-laptop-5-qwen-cgw`).
+2. Self-hosted runner registered to the repo with label **`qwen-local-llm`**.
 3. Runner process online (`gh api repos/<owner>/<repo>/actions/runners`).
 
 ## Secrets (optional on self-hosted)
@@ -46,14 +46,14 @@ gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen2.5-coder-review:7b'
   12,000-character individual-file or 160,000-character whole-PR budget would omit a reviewable file, the run fails
   instead of publishing a partial success. Generated, lock, documentation, and
   asset files are reported separately as intentional low-signal exclusions.
-- Publishes the current-head check run `qwen-code-review`; failed reviews remain
-  failed and do not satisfy reviewer presence.
+- Publishes the current-head check run `qwen-code-review`. That check is optional.
+  A failed or missing Qwen review does not block merge.
 
 ## Bot wait / tagging
 
 ```sh
-# After fix pushes — mention bots and wake Qwen:
-# @qwen-review
+# After fix pushes — mention Codex and Sourcery where this repository requires them.
+# Qwen is optional; do not wait for it.
 npm run wait-for-bots -- --bot-tag
 ```
 
@@ -63,7 +63,7 @@ Review vendors are advisory by default; required reviewer presence defaults to o
 
 | Symptom | Fix |
 |---------|-----|
-| Job queued forever | Start runner: `C:\actions-runner-cgw\run.cmd`; confirm label `qwen-local-llm` |
+| Job queued forever | Start the self-hosted runner and confirm label `qwen-local-llm` |
 | Connection refused | Ensure Ollama is running (`ollama list`, port 11434) |
 | Slow / timeout | Keep Ollama warm and confirm no larger model is consuming the CPU runner |
 | Review reports `Operation not allowed` | Recreate `qwen2.5-coder-review:7b` from the checked-in Modelfile and confirm `ollama ps` shows context `8192` |

@@ -4,11 +4,15 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
+  blockingMissingRequiredKeys,
+  eventSatisfiesRequiredKey,
   DEFAULT_REQUIRED_KEYS,
   formatRequiredKeys,
+  missingRequiredKeysFromEvents,
   parseRequiredKeys,
   resolveRequiredKeys,
 } from './lib/bot-wait-config.mjs';
+import { isBotNoise } from './lib/bot-noise.mjs';
 import { BOT_GATE_CHECK_NAMES } from './lib/pr-gates-lib.mjs';
 import {
   combineRequiredCheckState,
@@ -19,11 +23,127 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (path) => readFileSync(join(root, path), 'utf8');
 
 assert.deepEqual(DEFAULT_REQUIRED_KEYS, []);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    ['gemini', 'codex', 'sourcery', 'qwen'],
+    [
+      { login: 'gemini-code-assist[bot]', body: 'ERROR: Gemini API quota exceeded' },
+      { login: 'sourcery-ai[bot]', body: 'Sorry, I could not review this pull request — rate limit' },
+    ],
+  ),
+  ['codex'],
+);
+assert.deepEqual(blockingMissingRequiredKeys(['gemini-code-assist[bot]'], []), []);
+assert.equal(
+  eventSatisfiesRequiredKey('chatgpt-codex-connector[bot]', 'Thanks!', 'codex'),
+  false,
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [{ login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' }],
+    ),
+    [{ login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' }],
+  ),
+  ['codex'],
+);
+const codexFailureNotice = 'Sorry, I could not review this pull request — rate limit';
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [
+        { login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' },
+        { login: 'chatgpt-codex-connector[bot]', body: codexFailureNotice },
+      ],
+    ),
+    [
+      { login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' },
+      { login: 'chatgpt-codex-connector[bot]', body: codexFailureNotice },
+    ],
+  ),
+  [],
+);
+const fencedQwenFailure = [
+  '<!-- qwen-code-review -->',
+  'Review outcome: failed',
+  'Qwen review did not complete successfully.',
+  '',
+  '```text',
+  'ERROR',
+  '```',
+].join('\n');
+assert.equal(isBotNoise(fencedQwenFailure), true);
+assert.equal(isBotNoise('<!-- gemini-code-review -->\n503 Service Unavailable'), true);
+assert.deepEqual(parseRequiredKeys('github-actions[bot],codex'), ['codex']);
+const codexPhraseFinding = 'The parser could not review an empty review body and this function should reject it.';
+assert.equal(
+  eventSatisfiesRequiredKey('chatgpt-codex-connector[bot]', codexPhraseFinding, 'codex'),
+  true,
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [{ login: 'chatgpt-codex-connector[bot]', body: codexPhraseFinding }],
+    ),
+    [{ login: 'chatgpt-codex-connector[bot]', body: codexPhraseFinding }],
+  ),
+  [],
+);
+assert.deepEqual(blockingMissingRequiredKeys(['qwen'], []), []);
+assert.deepEqual(blockingMissingRequiredKeys(['cursor'], []), []);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    ['qwen'],
+    [{
+      login: 'github-actions[bot]',
+      body: '<!-- qwen-code-review -->\nReview outcome: findings\nReviewed commit: `abc`\nThe finding discusses HTTP 429 rate limit handling.',
+    }],
+  ),
+  [],
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    ['qwen'],
+    [{
+      login: 'github-actions[bot]',
+      body: '<!-- qwen-code-review -->\nReview outcome: failed\nReviewed commit: `aaaaaaa`\nQwen review did not complete successfully.',
+    }],
+    { expectedHeadSha: 'bbbbbbb' },
+  ),
+  [],
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    ['qwen'],
+    [{
+      login: 'github-actions[bot]',
+      body: '<!-- qwen-code-review -->\nReview outcome: failed\nReviewed commit: `bbbbbbb`\nQwen review did not complete successfully.',
+    }],
+    { expectedHeadSha: 'bbbbbbb' },
+  ),
+  [],
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [{ login: 'chatgpt-codex-connector[bot]', body: 'This reachable branch drops the release artifact.' }],
+    ),
+    [{ login: 'chatgpt-codex-connector[bot]', body: 'This reachable branch drops the release artifact.' }],
+  ),
+  [],
+);
 assert.deepEqual(parseRequiredKeys(undefined), []);
 assert.deepEqual(parseRequiredKeys('off'), []);
 assert.deepEqual(parseRequiredKeys('none'), []);
 assert.deepEqual(parseRequiredKeys('codex,coderabbit'), ['codex', 'coderabbit']);
-assert.deepEqual(resolveRequiredKeys([], 'codex'), []);
+assert.deepEqual(parseRequiredKeys('codex,qwen,sourcery'), ['codex', 'sourcery']);
+assert.deepEqual(parseRequiredKeys('qwen'), []);
+assert.deepEqual(resolveRequiredKeys(['codex', 'qwen', 'cursor'], 'sourcery'), ['codex']);
+assert.deepEqual(resolveRequiredKeys([], 'codex,qwen'), []);
 assert.equal(formatRequiredKeys([]), 'none (reviewers advisory)');
 assert.deepEqual(BOT_GATE_CHECK_NAMES, ['bot-feedback-gate']);
 

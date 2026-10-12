@@ -16,4 +16,4 @@ $env:GEMINI_API_KEY = 'YOUR_KEY'
 
 Copy `templates/.github/workflows/gemini-review.yml` to `.github/workflows/gemini-review.yml` (bootstrap does this).
 
-On `pull_request` opened/synchronize, Gemini posts a PR comment titled **Code Review by Gemini** (marker `<!-- gemini-code-review -->`). Ship-bar `wait-for-bots` treats that as the **gemini** required bot.
+On `pull_request` opened/synchronize, Gemini posts a PR comment titled **Code Review by Gemini** (marker `<!-- gemini-code-review -->`). A missing Gemini review, and a Gemini 503, quota, empty, or other non-substantive failure, does not block `wait-for-bots` even when `BOT_WAIT_REQUIRED` lists `gemini`. Substantive Gemini findings still go through the feedback gate.
