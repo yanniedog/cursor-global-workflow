@@ -34,6 +34,16 @@ assert.deepEqual(
 assert.deepEqual(blockingMissingRequiredKeys(['gemini'], []), []);
 assert.deepEqual(
   blockingMissingRequiredKeys(
+    ['qwen'],
+    [{
+      login: 'github-actions[bot]',
+      body: '<!-- qwen-code-review -->\nReview outcome: findings\nReviewed commit: `abc`\nThe finding discusses HTTP 429 rate limit handling.',
+    }],
+  ),
+  ['qwen'],
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
     missingRequiredKeysFromEvents(
       ['codex'],
       [{ login: 'chatgpt-codex-connector[bot]', body: 'This reachable branch drops the release artifact.' }],

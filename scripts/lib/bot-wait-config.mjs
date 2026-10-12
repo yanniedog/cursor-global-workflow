@@ -97,9 +97,16 @@ const REVIEWER_NONSENSE_PATTERNS = [
 ];
 
 /** Quota, API errors, empty reviews, and "could not review" notices are not a completed review. */
+function isSuccessfulQwenReview(body) {
+  return isQwenCodeReviewBody(body)
+    && /\bReview outcome:\s*(completed|no findings|findings)\b/i.test(body)
+    && !/did not complete successfully|review failed/i.test(body);
+}
+
 export function isReviewerNonsenseFailure(bodyRaw) {
   const body = String(bodyRaw ?? '').trim();
   if (!body) return true;
+  if (isSuccessfulQwenReview(body)) return false;
   return isQuotaBotMessage(body) || REVIEWER_NONSENSE_PATTERNS.some((pattern) => pattern.test(body));
 }
 
