@@ -22,6 +22,8 @@ import {
   isGeminiCodeReviewBody,
   isQwenCodeReviewBody,
   blockingMissingRequiredKeys,
+  eventSatisfiesRequiredKey,
+  isReviewerNonsenseFailure,
   missingRequiredKeysFromEvents,
   parseRequiredKeys,
   resolveRequiredKeys,
@@ -268,7 +270,9 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
   const knownEvents = activity.events.filter(
     (e) => isKnownBotLogin(e.login, knownBots) && new Date(e.at).getTime() >= anchorMs,
   );
-  const botEventsSinceAnchor = knownEvents.filter((e) => !isBotNoise(e.body));
+  const botEventsSinceAnchor = knownEvents.filter(
+    (e) => !isBotNoise(e.body) && !isReviewerNonsenseFailure(e.body),
+  );
   const seenLogins = [...new Set(botEventsSinceAnchor.map((e) => e.login))];
   const unsatisfied = missingRequiredKeysFromEvents(requiredKeys, knownEvents, {
     expectedHeadSha,
@@ -303,9 +307,16 @@ function evaluate({ prNumber, anchorIso, expectedHeadSha, state, repo: repoIn, r
   }
 
   if (checksReady && minElapsed && allRequiredPosted && quiet) {
+    const posted = requiredKeys.filter(
+      (key) => knownEvents.some((event) => eventSatisfiesRequiredKey(event.login, event.body, key, { expectedHeadSha })),
+    );
+    const excused = requiredKeys.filter((key) => !posted.includes(key));
+    const message = excused.length
+      ? `Bot wait satisfied (${QUIET_WINDOW_SEC}s quiet). Posted: ${posted.join(', ') || 'none'}. Non-blocking or excused: ${excused.join(', ')}.`
+      : `Bot wait satisfied (required bots posted since anchor; ${QUIET_WINDOW_SEC}s quiet). Clear to sweep threads.`;
     return {
       status: 'ready',
-      message: `Bot wait satisfied (required bots posted since anchor; ${QUIET_WINDOW_SEC}s quiet). Clear to sweep threads.`,
+      message,
       lastBotAt: lastBotAt?.toISOString() || null,
       botsSeen: seenLogins,
       missing: [],
@@ -475,6 +486,10 @@ async function main() {
   const finish = (result) => {
     const st = readState(prNumber) || state;
     if (result.status === 'ready') {
+      if (st.headSha && st.headSha !== headSha) {
+        console.log(`>>> BOT WAIT: evaluated ${headSha} but saved state is ${st.headSha}; not recording ready.`);
+        process.exit(2);
+      }
       console.log(`>>> ${result.message}`);
       if (result.botsSeen?.length) console.log(`>>> Bots seen since anchor: ${result.botsSeen.join(', ')}`);
       st.readyAt = new Date().toISOString();

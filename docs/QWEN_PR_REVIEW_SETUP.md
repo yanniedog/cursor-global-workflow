@@ -46,14 +46,14 @@ gh secret set QWEN_MODEL --repo OWNER/REPO --body 'qwen2.5-coder-review:7b'
   12,000-character individual-file or 160,000-character whole-PR budget would omit a reviewable file, the run fails
   instead of publishing a partial success. Generated, lock, documentation, and
   asset files are reported separately as intentional low-signal exclusions.
-- Publishes the current-head check run `qwen-code-review`; failed reviews remain
-  failed and do not satisfy reviewer presence.
+- Publishes the current-head check run `qwen-code-review`. That check is optional.
+  A failed or missing Qwen review does not block merge.
 
 ## Bot wait / tagging
 
 ```sh
-# After fix pushes — mention bots and wake Qwen:
-# @qwen-review
+# After fix pushes — mention Codex and Sourcery where this repository requires them.
+# Qwen is optional; do not wait for it.
 npm run wait-for-bots -- --bot-tag
 ```
 

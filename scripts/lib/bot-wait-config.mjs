@@ -2,7 +2,7 @@
  * Required-bot aliases for wait-for-bots and pr-bot-feedback-check.
  * Keys are short names (gemini, codex, sourcery, qwen, cursor); values are GitHub logins to match.
  */
-import { isQuotaBotMessage } from './bot-noise.mjs';
+import { isQuotaBotMessage, isTrivialBotMessage } from './bot-noise.mjs';
 
 export const BOT_ALIASES = {
   gemini: [
@@ -58,11 +58,23 @@ export function isCursorAutoReviewBody(bodyRaw) {
  * Body-aware match so github-actions[bot] Qwen vs Gemini reviews do not
  * satisfy each other's required keys.
  */
+const GEMINI_ALIAS_KEYS = new Set([
+  'gemini',
+  'gemini-code-assist',
+  'gemini-code-assist[bot]',
+  'google-github-actions-bot[bot]',
+  'google-github-actions[bot]',
+]);
+
+export function isGeminiRequiredKey(key) {
+  return GEMINI_ALIAS_KEYS.has(String(key || '').toLowerCase());
+}
+
 export function eventSatisfiesRequiredKey(login, body, key, opts = {}) {
   const lower = String(login || '').toLowerCase();
   const k = String(key || '').toLowerCase();
   if (!lower) return false;
-  if (isQuotaBotMessage(body)) return false;
+  if (isQuotaBotMessage(body) || isTrivialBotMessage(body) || isReviewerNonsenseFailure(body)) return false;
   if (k === 'qwen' || k === 'cursor') {
     const markerMatches =
       lower === 'github-actions[bot]' &&
@@ -142,7 +154,7 @@ export function omitNeverRequiredKeys(keys) {
 export function blockingMissingRequiredKeys(missing, events) {
   return (missing || []).filter((key) => {
     const normalized = String(key || '').toLowerCase();
-    if (normalized === 'gemini' || NEVER_REQUIRED_KEYS.has(normalized)) return false;
+    if (isGeminiRequiredKey(normalized) || NEVER_REQUIRED_KEYS.has(normalized)) return false;
     const related = eventsForRequiredKey(normalized, events);
     if (related.length === 0) return true;
     return !related.every((event) => isReviewerNonsenseFailure(event.body));

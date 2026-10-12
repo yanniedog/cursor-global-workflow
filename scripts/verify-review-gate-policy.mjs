@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   blockingMissingRequiredKeys,
+  eventSatisfiesRequiredKey,
   DEFAULT_REQUIRED_KEYS,
   formatRequiredKeys,
   missingRequiredKeysFromEvents,
@@ -31,7 +32,21 @@ assert.deepEqual(
   ),
   ['codex'],
 );
-assert.deepEqual(blockingMissingRequiredKeys(['gemini'], []), []);
+assert.deepEqual(blockingMissingRequiredKeys(['gemini-code-assist[bot]'], []), []);
+assert.equal(
+  eventSatisfiesRequiredKey('chatgpt-codex-connector[bot]', 'Thanks!', 'codex'),
+  false,
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [{ login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' }],
+    ),
+    [{ login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' }],
+  ),
+  ['codex'],
+);
 assert.deepEqual(blockingMissingRequiredKeys(['qwen'], []), []);
 assert.deepEqual(blockingMissingRequiredKeys(['cursor'], []), []);
 assert.deepEqual(
