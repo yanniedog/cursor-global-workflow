@@ -47,6 +47,38 @@ assert.deepEqual(
   ),
   ['codex'],
 );
+const codexFailureNotice = 'Sorry, I could not review this pull request — rate limit';
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [
+        { login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' },
+        { login: 'chatgpt-codex-connector[bot]', body: codexFailureNotice },
+      ],
+    ),
+    [
+      { login: 'chatgpt-codex-connector[bot]', body: 'Thanks!' },
+      { login: 'chatgpt-codex-connector[bot]', body: codexFailureNotice },
+    ],
+  ),
+  [],
+);
+const codexPhraseFinding = 'The parser could not review an empty review body and this function should reject it.';
+assert.equal(
+  eventSatisfiesRequiredKey('chatgpt-codex-connector[bot]', codexPhraseFinding, 'codex'),
+  true,
+);
+assert.deepEqual(
+  blockingMissingRequiredKeys(
+    missingRequiredKeysFromEvents(
+      ['codex'],
+      [{ login: 'chatgpt-codex-connector[bot]', body: codexPhraseFinding }],
+    ),
+    [{ login: 'chatgpt-codex-connector[bot]', body: codexPhraseFinding }],
+  ),
+  [],
+);
 assert.deepEqual(blockingMissingRequiredKeys(['qwen'], []), []);
 assert.deepEqual(blockingMissingRequiredKeys(['cursor'], []), []);
 assert.deepEqual(

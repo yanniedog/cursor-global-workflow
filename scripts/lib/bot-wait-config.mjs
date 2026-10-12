@@ -2,7 +2,7 @@
  * Required-bot aliases for wait-for-bots and pr-bot-feedback-check.
  * Keys are short names (gemini, codex, sourcery, qwen, cursor); values are GitHub logins to match.
  */
-import { isQuotaBotMessage, isTrivialBotMessage } from './bot-noise.mjs';
+import { isQuotaBotMessage, isTrivialBotMessage, looksLikeSubstantiveFinding } from './bot-noise.mjs';
 
 export const BOT_ALIASES = {
   gemini: [
@@ -74,7 +74,7 @@ export function eventSatisfiesRequiredKey(login, body, key, opts = {}) {
   const lower = String(login || '').toLowerCase();
   const k = String(key || '').toLowerCase();
   if (!lower) return false;
-  if (isQuotaBotMessage(body) || isTrivialBotMessage(body) || isReviewerNonsenseFailure(body)) return false;
+  if (isTrivialBotMessage(body) || isReviewerNonsenseFailure(body)) return false;
   if (k === 'qwen' || k === 'cursor') {
     const markerMatches =
       lower === 'github-actions[bot]' &&
@@ -103,9 +103,8 @@ export function missingRequiredKeysFromEvents(requiredKeys, events, opts = {}) {
 }
 
 const REVIEWER_NONSENSE_PATTERNS = [
-  /could not review/i,
-  /couldn'?t review/i,
-  /\bempty review\b/i,
+  /^\s*(?:>\s*)?(?:sorry[,!\s-]*)?(?:i |we )?(?:could not|couldn't|cannot|unable to|failed to)\s+review\b/im,
+  /^\s*(?:(?:>\s*)?(?:the )?(?:model |reviewer |gemini )?(?:returned|posted|produced|received) an )?empty review\b/im,
 ];
 
 /** Quota, API errors, empty reviews, and "could not review" notices are not a completed review. */
@@ -118,7 +117,7 @@ function isSuccessfulQwenReview(body) {
 export function isReviewerNonsenseFailure(bodyRaw) {
   const body = String(bodyRaw ?? '').trim();
   if (!body) return true;
-  if (isSuccessfulQwenReview(body)) return false;
+  if (isSuccessfulQwenReview(body) || looksLikeSubstantiveFinding(body)) return false;
   return isQuotaBotMessage(body) || REVIEWER_NONSENSE_PATTERNS.some((pattern) => pattern.test(body));
 }
 
@@ -155,7 +154,8 @@ export function blockingMissingRequiredKeys(missing, events) {
   return (missing || []).filter((key) => {
     const normalized = String(key || '').toLowerCase();
     if (isGeminiRequiredKey(normalized) || NEVER_REQUIRED_KEYS.has(normalized)) return false;
-    const related = eventsForRequiredKey(normalized, events);
+    const related = eventsForRequiredKey(normalized, events)
+      .filter((event) => !isTrivialBotMessage(event.body));
     if (related.length === 0) return true;
     return !related.every((event) => isReviewerNonsenseFailure(event.body));
   });

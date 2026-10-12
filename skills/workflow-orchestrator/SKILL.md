@@ -60,7 +60,7 @@ Each PR gets the **full** ship bar (steps 1?9 in `WORKFLOW.md`).
 
 - All bot **implement** commits are on the PR branch **before** merge (rebase/push if bots posted after last push).
 - GitHub required checks **`bot-presence-gate`** and **`pr-bot-feedback-check`** are green (when branch protection is enabled).
-- `npm run wait-for-bots -- --pr <n>` exit **0** ? **gemini**, **codex**, and **sourcery** must each post since anchor, then quiet window. Exit **1** = required bots missing at cap ? **do not merge**.
+- `npm run wait-for-bots -- --pr <n>` exit **0** — **codex** and **sourcery** must each post since anchor when that repository requires them, then quiet window. A missing Qwen review exits 0. Gemini quota, 503, empty, or other non-substantive Gemini failure does not block. Exit **1** = missing required bots at cap — **do not merge**.
 - `npm run pr:bot-feedback-check -- --pr <n>` exit **0** ? includes required-bot presence and thread closure.
 - **Never** `npm run pr:merge` / `gh pr merge --auto --squash` on "CI green" alone or before both GitHub checks and local gates pass.
 - **Never** close a PR without merge unless the user waives in writing; auditor fails on closed-unmerged PRs with open bot threads.

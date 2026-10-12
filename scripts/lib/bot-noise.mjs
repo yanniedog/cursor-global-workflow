@@ -23,7 +23,7 @@
 
 const QUOTA_PATTERNS = [
   /^\s*(?:>\s*)?(?:#{1,6}\s*)?(?:review )?rate[ -]limit(?:ed| reached| exceeded)?[.!\s]*$/im,
-  /(?:couldn.t|cannot|unable to|failed to)\s+(?:review|process|complete)\b/i,
+  /^\s*(?:>\s*)?(?:sorry[,!\s-]*)?(?:i |we )?(?:couldn.t|could not|cannot|unable to|failed to)\s+(?:review|process|complete)\b/im,
   /\b(?:your|our|we(?:.ve| have) (?:hit|reached))\b[^\n]{0,70}\b(?:quota|limit|credits|trial)\b/i,
   /^\s*(?:ERROR:|Review outcome:\s*failed\b)/im,
   /\breview activity has ceased\b/i,
@@ -39,14 +39,25 @@ const TRIVIAL_PATTERNS = [
 ];
 
 /**
+ * A code finding can mention a failure phrase without being a vendor notice.
+ * Those reviews still have to satisfy presence and the feedback gate.
  * @param {string} bodyRaw
  * @returns {boolean}
  */
+export function looksLikeSubstantiveFinding(bodyRaw) {
+  const text = String(bodyRaw || '');
+  if (/```|!\[[^\]]*Badge\]|\bP[12] Badge\b/i.test(text)) return true;
+  if (/\b(?:this|that) (?:branch|change|commit|function|method|path|handler|parser|retry path)\b/i.test(text)) return true;
+  if (/\b(?:deletes|drops|mishandles)\b/i.test(text)) return true;
+  return false;
+}
+
 export function isQuotaBotMessage(bodyRaw) {
   if (!bodyRaw) return false;
   const body = String(bodyRaw).trim();
   if (!body) return false;
   if (/^Review outcome:\s*(?:completed|no findings|findings)\s*$/im.test(body)) return false;
+  if (looksLikeSubstantiveFinding(body)) return false;
   return QUOTA_PATTERNS.some((re) => re.test(body));
 }
 
