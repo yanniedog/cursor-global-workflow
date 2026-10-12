@@ -29,6 +29,8 @@ const QUOTA_PATTERNS = [
   /\breview activity has ceased\b/i,
   /\bconsumer version (?:has been )?(?:sunset|retired|deprecated)\b/i,
   /\bdid not complete successfully\b/i,
+  /^<!--\s*gemini-code-review\s*-->\s*[45]\d\d(?:\s+\S+){0,4}[.!]*$/i,
+  /^[45]\d\d\s+service unavailable[.!]*$/i,
 ];
 
 const TRIVIAL_PATTERNS = [

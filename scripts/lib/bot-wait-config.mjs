@@ -138,7 +138,7 @@ function eventsForRequiredKey(key, events) {
 }
 
 /** Qwen and the legacy cursor-auto-review key are the same optional reviewer. */
-const NEVER_REQUIRED_KEYS = new Set(['qwen', 'cursor']);
+const NEVER_REQUIRED_KEYS = new Set(['qwen', 'cursor', 'github-actions[bot]']);
 
 export function omitNeverRequiredKeys(keys) {
   return (keys || []).filter((key) => !NEVER_REQUIRED_KEYS.has(String(key || '').toLowerCase()));

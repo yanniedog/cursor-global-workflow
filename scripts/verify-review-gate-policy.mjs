@@ -75,6 +75,8 @@ const fencedQwenFailure = [
   '```',
 ].join('\n');
 assert.equal(isBotNoise(fencedQwenFailure), true);
+assert.equal(isBotNoise('<!-- gemini-code-review -->\n503 Service Unavailable'), true);
+assert.deepEqual(parseRequiredKeys('github-actions[bot],codex'), ['codex']);
 const codexPhraseFinding = 'The parser could not review an empty review body and this function should reject it.';
 assert.equal(
   eventSatisfiesRequiredKey('chatgpt-codex-connector[bot]', codexPhraseFinding, 'codex'),
